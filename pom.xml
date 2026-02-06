@@ -43,6 +43,13 @@
       <artifactId>framework-java</artifactId>
       <version>1.0.0</version>
     </dependency>
+
+    <!-- PostgreSQL Driver -->
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <version>42.7.1</version>
+    </dependency>
   </dependencies>
 
   <build>
