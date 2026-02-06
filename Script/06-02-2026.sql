@@ -15,6 +15,7 @@ CREATE TABLE hotel (
 -- ============================
 -- Table RESERVATION
 -- ============================
+
 CREATE TABLE reservation (
     id SERIAL PRIMARY KEY,
 
