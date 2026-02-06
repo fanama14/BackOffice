@@ -1,0 +1,53 @@
+TODO - Sprint 1 : 
+Organisation :
+TL : Lysa
+Dev BackOffice : Fana
+Dev FrontOffice : Luberri
+
+1. Base de données
+Creation de la table hotel :
+id
+nom
+adresse
+ville
+telephone
+
+Creation de la table reservation :
+id
+client_id (pas de table client)
+nb_passager
+date_heure_arrivee (DATETIME)
+id_hotel (clé étrangère vers hotel.id)
+
+Création des tables en base
+Création d’un script d’insertion de données pour la table hotel
+Test des insertions d’hôtels
+
+2. BackOffice :
+Définition des entités :
+Hotel
+Reservation
+
+Création du traitement d’insertion d’une réservation
+Test de l’insertion d’une réservation en base
+
+Définition de l’API REST de réservation (format JSON)
+Création de l’endpoint de récupération des réservations par date
+
+Exemple :
+GET /api/reservations?date=yyyy-MM-dd
+Test de l’API avec une date donnée
+
+3. FrontOffice :
+Définition du modèle correspondant au JSON de réservation
+Définition de l’URL de l’API BackOffice
+Appel de l’API BackOffice avec une date (format yyyy-MM-dd)
+Test de la récupération du JSON
+Création de l’affichage de la liste des réservations
+Test de l’affichage filtré par date
+
+4. Intégration api vers FrontOffice :
+Définition du contrat JSON entre BackOffice et FrontOffice
+Appel de l’API BackOffice depuis le FrontOffice
+Test de la communication BackOffice → FrontOffice
+Test du filtrage par date (date unique, sans heure)
