@@ -1,4 +1,4 @@
-package com.backoffice.controller;
+package mg.teste;
 
 import mg.framework.annotations.Controller;
 import mg.framework.annotations.GET;
@@ -21,9 +21,6 @@ public class ReservationController {
     private final HotelDAO hotelDAO = new HotelDAO();
     private final ReservationDAO reservationDAO = new ReservationDAO();
 
-    /**
-     * Affiche le formulaire de réservation
-     */
     @GET("reservation/form")
     public ModelView showForm() {
         ModelView mv = new ModelView("reservation-form");
@@ -36,9 +33,6 @@ public class ReservationController {
         return mv;
     }
 
-    /**
-     * Enregistre une réservation et retourne au formulaire
-     */
     @POST("reservation/save")
     public ModelView save(@RequestParam("clientId") String clientId,
             @RequestParam("nombrePassager") int nombrePassager,
@@ -59,7 +53,6 @@ public class ReservationController {
             mv.addData("error", "Erreur lors de l'enregistrement : " + e.getMessage());
         }
 
-        // Recharger la liste des hôtels pour le formulaire
         try {
             List<Hotel> hotels = hotelDAO.findAll();
             mv.addData("hotels", hotels);
@@ -70,9 +63,6 @@ public class ReservationController {
         return mv;
     }
 
-    /**
-     * API REST: Retourne la liste des réservations en JSON
-     */
     @GET("api/reservation/list")
     @RestAPI
     public List<Reservation> listJSON() {

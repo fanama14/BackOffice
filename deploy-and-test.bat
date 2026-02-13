@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-set TOMCAT_HOME=C:\apache-tomcat-9.0.82\apache-tomcat-9.0.82
+set TOMCAT_HOME=C:\xampp\tomcat
 set APP_NAME=BackOffice
 
 echo ========================================
@@ -9,14 +9,16 @@ echo  DEPLOIEMENT - BackOffice
 echo ========================================
 echo.
 
-echo [1/5] Compilation du framework-core...
-cd /d "%~dp0..\framework-core"
-call mvn clean install -DskipTests
-if %ERRORLEVEL% NEQ 0 (
-    echo ERREUR: Echec de la compilation du framework-core
+echo [1/5] Verification du framework...
+cd /d "%~dp0"
+if not exist "lib\framework-java-1.0.0.jar" (
+    echo ERREUR: framework-java-1.0.0.jar non trouve dans lib/
     pause
     exit /b 1
 )
+REM Installation du framework dans le depot Maven local si necessaire
+call mvn install:install-file -Dfile="lib/framework-java-1.0.0.jar" -DgroupId=mg.framework -DartifactId=framework-java -Dversion=1.0.0 -Dpackaging=jar -q
+echo Framework OK.
 echo.
 
 echo [2/5] Compilation et packaging du BackOffice...
