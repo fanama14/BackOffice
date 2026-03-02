@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee" version="4.0">
+<web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd"
+         version="3.1">
     
     <!-- Configuration du package des contrôleurs -->
     <context-param>
         <param-name>controller-package</param-name>
-        <param-value>com.backoffice.controller</param-value>
+        <param-value>mg.teste</param-value>
     </context-param>
     
     <!-- Configuration d'authentification (optionnel) -->
@@ -20,6 +23,10 @@
     <servlet>
         <servlet-name>FrontServlet</servlet-name>
         <servlet-class>mg.framework.FrontServlet</servlet-class>
+        <init-param>
+            <param-name>controller-package</param-name>
+            <param-value>mg.teste</param-value>
+        </init-param>
         <load-on-startup>1</load-on-startup>
     </servlet>
     <servlet-mapping>

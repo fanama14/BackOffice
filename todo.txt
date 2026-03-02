@@ -51,3 +51,42 @@ Définition du contrat JSON entre BackOffice et FrontOffice
 Appel de l’API BackOffice depuis le FrontOffice
 Test de la communication BackOffice → FrontOffice
 Test du filtrage par date (date unique, sans heure)
+
+----------------------------------------------------------
+
+TODO - Sprint 2 :
+Organisation :
+TL : Luberri
+Dev BackOffice 1 : Lysa
+Dev BackOffice 2 : Fana
+
+1. Base de données
+Création de la table vehicule :
+id
+reference (VARCHAR, unique)
+nombre_place (INTEGER)
+type_carburant (VARCHAR : D=Diesel, ES=Essence, H=Hybride, EL=Électrique)
+
+Modification du script SQL pour la table vehicule
+Insertion de données de test pour la table vehicule
+Test des insertions de véhicules
+
+2. BackOffice - CRUD Véhicule :
+Définition de l'entité Vehicule
+
+Création de la page liste des véhicules
+Ajout des filtres : recherche par référence, type de carburant, nombre de places (min/max)
+Test de l'affichage de la liste avec filtres
+
+Création du formulaire d'ajout d'un véhicule
+Test de l'insertion d'un véhicule en base
+
+Création du formulaire de modification d'un véhicule
+Test de la modification d'un véhicule en base
+
+Création de la suppression d'un véhicule (avec confirmation)
+Test de la suppression d'un véhicule en base
+
+Définition de l'API REST véhicule (format JSON)
+Création de l'endpoint GET /api/vehicule/list
+Test de l'API

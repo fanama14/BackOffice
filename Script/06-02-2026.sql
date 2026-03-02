@@ -1,6 +1,3 @@
-
-
-
 -- ============================
 -- Table HOTEL
 -- ============================
@@ -40,7 +37,21 @@ INSERT INTO hotel (nom, adresse, ville, telephone) VALUES
 ('Highland Inn', 'Route d Andranomena', 'Fianarantsoa',  '+261340444444'),
 ('Lagoon Palace', 'Baie d Ambatoloaka', 'Nosy Be',  '+261381555555');
 
+-- ============================
+-- Table VEHICULE
+-- ============================
+CREATE TABLE vehicule (
+    id SERIAL PRIMARY KEY,
+    reference VARCHAR(100) NOT NULL UNIQUE,
+    nombre_place INTEGER NOT NULL,
+    type_carburant VARCHAR(2) NOT NULL CHECK (type_carburant IN ('D', 'ES', 'H', 'EL'))
+);
 
+-- D = Diesel, ES = Essence, H = Hybride, EL = Electrique
 
-
-
+INSERT INTO vehicule (reference, nombre_place, type_carburant) VALUES
+('VH-001', 5, 'ES'),
+('VH-002', 7, 'D'),
+('VH-003', 4, 'EL'),
+('VH-004', 5, 'H'),
+('VH-005', 9, 'D');
