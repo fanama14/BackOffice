@@ -48,6 +48,7 @@
         <div class="menu">
             <a href="${pageContext.request.contextPath}/reservation/form">Formulaire de Reservation</a>
             <a href="${pageContext.request.contextPath}/vehicule/list">Gestion des Vehicules</a>
+            <a href="${pageContext.request.contextPath}/planification">Planification des Transports</a>
         </div>
     </div>
 </body>

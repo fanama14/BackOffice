@@ -6,6 +6,7 @@ public class Hotel {
     private String adresse;
     private String ville;
     private String telephone;
+    private double distanceAeroport;  // distance en km depuis l'aéroport
 
     public Hotel() {
     }
@@ -48,5 +49,13 @@ public class Hotel {
 
     public void setTelephone(String telephone) {
         this.telephone = telephone;
+    }
+
+    public double getDistanceAeroport() {
+        return distanceAeroport;
+    }
+
+    public void setDistanceAeroport(double distanceAeroport) {
+        this.distanceAeroport = distanceAeroport;
     }
 }

@@ -8,6 +8,13 @@ public class Reservation {
     private int nombrePassager;
     private Timestamp dateArrivee;
     private int hotelId;
+    private Integer idVehicule;
+    
+    // Champs calculés pour l'affichage dans la planification
+    private String hotelNom;
+    private String vehiculeReference;
+    private Timestamp heureDepartAeroport;
+    private Timestamp heureArriveeAeroport;
 
     public Reservation() {
     }
@@ -50,5 +57,45 @@ public class Reservation {
 
     public void setHotelId(int hotelId) {
         this.hotelId = hotelId;
+    }
+
+    public Integer getIdVehicule() {
+        return idVehicule;
+    }
+
+    public void setIdVehicule(Integer idVehicule) {
+        this.idVehicule = idVehicule;
+    }
+
+    public String getHotelNom() {
+        return hotelNom;
+    }
+
+    public void setHotelNom(String hotelNom) {
+        this.hotelNom = hotelNom;
+    }
+
+    public String getVehiculeReference() {
+        return vehiculeReference;
+    }
+
+    public void setVehiculeReference(String vehiculeReference) {
+        this.vehiculeReference = vehiculeReference;
+    }
+
+    public Timestamp getHeureDepartAeroport() {
+        return heureDepartAeroport;
+    }
+
+    public void setHeureDepartAeroport(Timestamp heureDepartAeroport) {
+        this.heureDepartAeroport = heureDepartAeroport;
+    }
+
+    public Timestamp getHeureArriveeAeroport() {
+        return heureArriveeAeroport;
+    }
+
+    public void setHeureArriveeAeroport(Timestamp heureArriveeAeroport) {
+        this.heureArriveeAeroport = heureArriveeAeroport;
     }
 }

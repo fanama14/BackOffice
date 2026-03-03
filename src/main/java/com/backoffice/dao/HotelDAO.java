@@ -11,7 +11,7 @@ public class HotelDAO {
 
     public List<Hotel> findAll() throws SQLException {
         List<Hotel> hotels = new ArrayList<>();
-        String sql = "SELECT id, nom, adresse, ville, telephone FROM hotel ORDER BY nom";
+        String sql = "SELECT id, nom, adresse, ville, telephone, distance_aeroport FROM hotel ORDER BY nom";
 
         try (Connection conn = DatabaseConnection.getConnection();
                 PreparedStatement ps = conn.prepareStatement(sql);
@@ -24,6 +24,7 @@ public class HotelDAO {
                 h.setAdresse(rs.getString("adresse"));
                 h.setVille(rs.getString("ville"));
                 h.setTelephone(rs.getString("telephone"));
+                h.setDistanceAeroport(rs.getDouble("distance_aeroport"));
                 hotels.add(h);
             }
         }
@@ -31,7 +32,7 @@ public class HotelDAO {
     }
 
     public Hotel findById(int id) throws SQLException {
-        String sql = "SELECT id, nom, adresse, ville, telephone FROM hotel WHERE id = ?";
+        String sql = "SELECT id, nom, adresse, ville, telephone, distance_aeroport FROM hotel WHERE id = ?";
 
         try (Connection conn = DatabaseConnection.getConnection();
                 PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -45,6 +46,7 @@ public class HotelDAO {
                     h.setAdresse(rs.getString("adresse"));
                     h.setVille(rs.getString("ville"));
                     h.setTelephone(rs.getString("telephone"));
+                    h.setDistanceAeroport(rs.getDouble("distance_aeroport"));
                     return h;
                 }
             }
