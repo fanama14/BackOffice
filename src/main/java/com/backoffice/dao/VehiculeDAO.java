@@ -94,6 +94,45 @@ public class VehiculeDAO {
     }
 
     /**
+     * Récupère les véhicules disponibles pour une réservation, triés par règles d'assignation :
+     * 1. nombre_place >= nombrePassager, le plus proche en premier
+     * 2. Priorité carburant : D > ES > H > EL
+     * 
+     * @param nombrePassager Nombre de passagers minimum requis
+     * @return Liste des véhicules triés par pertinence
+     */
+    public List<Vehicule> findBestVehicles(int nombrePassager) throws SQLException {
+        List<Vehicule> vehicules = new ArrayList<>();
+        
+        String sql = "SELECT v.id, v.reference, v.nombre_place, v.type_carburant " +
+                     "FROM vehicule v " +
+                     "WHERE v.nombre_place >= ? " +
+                     "ORDER BY " +
+                     "    ABS(v.nombre_place - ?) ASC, " +
+                     "    CASE v.type_carburant " +
+                     "        WHEN 'D' THEN 1 " +
+                     "        WHEN 'ES' THEN 2 " +
+                     "        WHEN 'H' THEN 3 " +
+                     "        WHEN 'EL' THEN 4 " +
+                     "        ELSE 5 " +
+                     "    END ASC";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+                PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, nombrePassager);
+            ps.setInt(2, nombrePassager);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    vehicules.add(mapResultSetToVehicule(rs));
+                }
+            }
+        }
+        return vehicules;
+    }
+
+    /**
      * Récupère les véhicules disponibles pour une réservation
      * Ordonnés par règles d'assignation:
      * 1. Nombre de places le plus proche du nombre de passagers

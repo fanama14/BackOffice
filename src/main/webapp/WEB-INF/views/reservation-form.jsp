@@ -1,6 +1,7 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@ page import="java.util.List" %>
 <%@ page import="com.backoffice.model.Hotel" %>
+<%@ page import="com.backoffice.model.Aeroport" %>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -127,6 +128,25 @@
                     %>
                         <option value="<%= hotel.getId() %>">
                             <%= hotel.getNom() %> - <%= hotel.getVille() %>
+                        </option>
+                    <%
+                            }
+                        }
+                    %>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="aeroportId">Aéroport d'arrivée</label>
+                <select id="aeroportId" name="aeroportId" required>
+                    <option value="">-- Sélectionnez un aéroport --</option>
+                    <%
+                        List<Aeroport> aeroports = (List<Aeroport>) request.getAttribute("aeroports");
+                        if (aeroports != null) {
+                            for (Aeroport aeroport : aeroports) {
+                    %>
+                        <option value="<%= aeroport.getId() %>">
+                            <%= aeroport.getCode() %> - <%= aeroport.getLibelle() %>
                         </option>
                     <%
                             }
