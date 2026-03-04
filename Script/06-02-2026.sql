@@ -38,7 +38,7 @@ INSERT INTO hotel (nom, adresse, ville, telephone) VALUES
 ('Lagoon Palace', 'Baie d Ambatoloaka', 'Nosy Be',  '+261381555555');
 
 -- ============================
--- Table VEHICULE
+-- Table VEHICULEjj
 -- ============================
 CREATE TABLE vehicule (
     id SERIAL PRIMARY KEY,

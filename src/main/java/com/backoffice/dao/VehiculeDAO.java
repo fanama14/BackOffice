@@ -94,6 +94,103 @@ public class VehiculeDAO {
     }
 
     /**
+     * Récupère les véhicules disponibles pour une réservation
+     * Ordonnés par règles d'assignation:
+     * 1. Nombre de places le plus proche du nombre de passagers
+     * 2. Priorité carburant: D > ES > H > EL
+     * 3. Random si égalité (géré par RANDOM())
+     * 
+     * @param nombrePassager Nombre de passagers minimum requis
+     * @param dateArrivee Date d'arrivée du vol
+     * @param tempsAttenteMinutes Temps d'attente à l'aéroport en minutes
+     * @param tempsTrajetMinutes Temps de trajet estimé en minutes
+     * @return Liste des véhicules disponibles triés par pertinence
+     */
+    public List<Vehicule> findAvailableVehicles(int nombrePassager, Timestamp dateArrivee,
+            int tempsAttenteMinutes, int tempsTrajetMinutes) throws SQLException {
+        List<Vehicule> vehicules = new ArrayList<>();
+        
+        // Calculer la fenêtre de temps pendant laquelle le véhicule sera occupé
+        // Un véhicule est considéré comme disponible s'il n'a pas d'autre réservation
+        // qui chevauche la période: [dateArrivee, dateArrivee + tempsAttente + tempsTrajet * 2]
+        // (aller-retour estimé)
+        
+        String sql = "SELECT v.id, v.reference, v.nombre_place, v.type_carburant " +
+                     "FROM vehicule v " +
+                     "WHERE v.nombre_place >= ? " +
+                     "AND v.id NOT IN (" +
+                     "    SELECT r.id_vehicule FROM reservation r " +
+                     "    WHERE r.id_vehicule IS NOT NULL " +
+                     "    AND r.date_arrivee BETWEEN ? AND ? " +
+                     ") " +
+                     "ORDER BY " +
+                     "    ABS(v.nombre_place - ?) ASC, " +  // Places les plus proches du besoin
+                     "    CASE v.type_carburant " +
+                     "        WHEN 'D' THEN 1 " +   // Diesel en priorité
+                     "        WHEN 'ES' THEN 2 " +  // Essence
+                     "        WHEN 'H' THEN 3 " +   // Hybride
+                     "        WHEN 'EL' THEN 4 " +  // Électrique
+                     "        ELSE 5 " +
+                     "    END ASC, " +
+                     "    RANDOM()";  // Random si égalité
+
+        try (Connection conn = DatabaseConnection.getConnection();
+                PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            // Fenêtre de conflit: 2h avant et après l'heure d'arrivée (pour simplifier)
+            long windowMs = 2 * 60 * 60 * 1000L; // 2 heures
+            Timestamp windowStart = new Timestamp(dateArrivee.getTime() - windowMs);
+            Timestamp windowEnd = new Timestamp(dateArrivee.getTime() + windowMs);
+
+            ps.setInt(1, nombrePassager);
+            ps.setTimestamp(2, windowStart);
+            ps.setTimestamp(3, windowEnd);
+            ps.setInt(4, nombrePassager);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    vehicules.add(mapResultSetToVehicule(rs));
+                }
+            }
+        }
+        return vehicules;
+    }
+
+    /**
+     * Calcule le nombre de places restantes dans un véhicule pour une période donnée
+     * en tenant compte des autres réservations qui partagent le même véhicule
+     */
+    public int getPlacesRestantes(int vehiculeId, Timestamp dateArrivee, int windowMinutes) throws SQLException {
+        String sql = "SELECT v.nombre_place, COALESCE(SUM(r.nombre_passager), 0) as passagers_assignes " +
+                     "FROM vehicule v " +
+                     "LEFT JOIN reservation r ON r.id_vehicule = v.id " +
+                     "    AND r.date_arrivee BETWEEN ? AND ? " +
+                     "WHERE v.id = ? " +
+                     "GROUP BY v.id, v.nombre_place";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+                PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            long windowMs = windowMinutes * 60 * 1000L;
+            Timestamp windowStart = new Timestamp(dateArrivee.getTime() - windowMs);
+            Timestamp windowEnd = new Timestamp(dateArrivee.getTime() + windowMs);
+
+            ps.setTimestamp(1, windowStart);
+            ps.setTimestamp(2, windowEnd);
+            ps.setInt(3, vehiculeId);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    int nombrePlace = rs.getInt("nombre_place");
+                    int passagersAssignes = rs.getInt("passagers_assignes");
+                    return nombrePlace - passagersAssignes;
+                }
+            }
+        }
+        return 0;
+    }
+
+    /**
      * Recherche des véhicules avec filtres
      * @param search Recherche textuelle sur la référence
      * @param typeCarburant Filtre par type de carburant (D, ES, H, EL)
