@@ -46,3 +46,4 @@ on peut regrouper des clients(reservations)
 3)si reservation 4 et une reservatioon a 2; on peut regrouper les 2 reservations dan vehicule 7 places
 4)les clientrs son indivisible : si reservation 4 et une reservatioon a 3; pn ne peut pas faire pour 7 places
 5)si 2 reservation groupees;exemple re1 ivato-40km->ibis ; re2 ivato-60km->colbert, on va vers ibis en premier ; donc ivato-40km->ibis-40km->colbert; donc on dois avoir dans la base touts les distances possibles puor les lieux
+6)si 2 reservation regoupe , memes distances , on va faire par ordre alphabetique; si l un : Ankadikely et l autre Tsiazompaniry, les 2 40km, on prend Ankadikely en premier,...
