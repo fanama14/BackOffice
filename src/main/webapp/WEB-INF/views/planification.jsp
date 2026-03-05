@@ -284,20 +284,20 @@
         <table>
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th>Réservation</th>
                     <th>Client</th>
-                    <th>Passagers</th>
-                    <th>Date Arrivée</th>
+                    <th>Nb Personnes</th>
+                    <th>Date/Heure Arrivée</th>
                     <th>Hôtel</th>
                     <th>Véhicule</th>
+                    <th>Distance (km)</th>
                     <th>Départ Aéroport</th>
                     <th>Retour Aéroport</th>
-                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <% for (Reservation r : reservations) { 
-                    boolean hasVehicule = r.getIdVehicule() != null;
+                    boolean hasVehicule = r.getVehiculeReference() != null;
                 %>
                 <tr class="<%= hasVehicule ? "status-assigned" : "status-pending" %>">
                     <td><%= r.getId() %></td>
@@ -309,40 +309,25 @@
                         <% if (hasVehicule) { %>
                             <span class="vehicule-badge vehicule-assigned">
                                 <%= r.getVehiculeReference() %>
+                                (<%= r.getVehiculeNombrePlace() %> pl. - <%= r.getVehiculeTypeCarburant() %>)
                             </span>
                         <% } else { %>
-                            <span class="vehicule-badge vehicule-pending">Non assigné</span>
+                            <span class="vehicule-badge vehicule-pending">Aucun disponible</span>
                         <% } %>
                     </td>
+                    <td><%= r.getDistanceKm() > 0 ? (r.getDistanceKm() * 2) + " km" : "-" %></td>
                     <td class="time-display">
                         <% if (r.getHeureDepartAeroport() != null) { %>
-                            <%= sdfTime.format(r.getHeureDepartAeroport()) %>
+                            <%= sdfDateTime.format(r.getHeureDepartAeroport()) %>
                         <% } else { %>
                             <span class="empty-cell">-</span>
                         <% } %>
                     </td>
                     <td class="time-display">
-                        <% if (r.getHeureArriveeAeroport() != null) { %>
-                            <%= sdfTime.format(r.getHeureArriveeAeroport()) %>
+                        <% if (r.getHeureRetourAeroport() != null) { %>
+                            <%= sdfDateTime.format(r.getHeureRetourAeroport()) %>
                         <% } else { %>
                             <span class="empty-cell">-</span>
-                        <% } %>
-                    </td>
-                    <td>
-                        <% if (!hasVehicule) { %>
-                        <form method="post" action="${pageContext.request.contextPath}/planification/assigner" style="display:inline;">
-                            <input type="hidden" name="reservationId" value="<%= r.getId() %>">
-                            <input type="hidden" name="dateDebut" value="<%= dateDebutParam != null ? dateDebutParam : "" %>">
-                            <input type="hidden" name="dateFin" value="<%= dateFinParam != null ? dateFinParam : "" %>">
-                            <button type="submit" class="btn btn-success btn-sm">Assigner véhicule</button>
-                        </form>
-                        <% } else { %>
-                        <form method="post" action="${pageContext.request.contextPath}/planification/retirer" style="display:inline;">
-                            <input type="hidden" name="reservationId" value="<%= r.getId() %>">
-                            <input type="hidden" name="dateDebut" value="<%= dateDebutParam != null ? dateDebutParam : "" %>">
-                            <input type="hidden" name="dateFin" value="<%= dateFinParam != null ? dateFinParam : "" %>">
-                            <button type="submit" class="btn btn-danger btn-sm">Retirer</button>
-                        </form>
                         <% } %>
                     </td>
                 </tr>

@@ -8,9 +8,11 @@ import mg.framework.annotations.RestAPI;
 import mg.framework.ModelView;
 
 import com.backoffice.dao.HotelDAO;
+import com.backoffice.dao.AeroportDAO;
 import com.backoffice.dao.ReservationDAO;
 import com.backoffice.model.Reservation;
 import com.backoffice.model.Hotel;
+import com.backoffice.model.Aeroport;
 
 import java.sql.Timestamp;
 import java.util.List;
@@ -19,6 +21,7 @@ import java.util.List;
 public class ReservationController {
 
     private final HotelDAO hotelDAO = new HotelDAO();
+    private final AeroportDAO aeroportDAO = new AeroportDAO();
     private final ReservationDAO reservationDAO = new ReservationDAO();
 
     @GET("reservation/form")
@@ -27,8 +30,10 @@ public class ReservationController {
         try {
             List<Hotel> hotels = hotelDAO.findAll();
             mv.addData("hotels", hotels);
+            List<Aeroport> aeroports = aeroportDAO.findAll();
+            mv.addData("aeroports", aeroports);
         } catch (Exception e) {
-            mv.addData("error", "Erreur lors du chargement des hôtels : " + e.getMessage());
+            mv.addData("error", "Erreur lors du chargement : " + e.getMessage());
         }
         return mv;
     }
@@ -37,7 +42,8 @@ public class ReservationController {
     public ModelView save(@RequestParam("clientId") String clientId,
             @RequestParam("nombrePassager") int nombrePassager,
             @RequestParam("dateArrivee") String dateArrivee,
-            @RequestParam("hotelId") int hotelId) {
+            @RequestParam("hotelId") int hotelId,
+            @RequestParam("aeroportId") int aeroportId) {
         ModelView mv = new ModelView("reservation-form");
         try {
             Reservation reservation = new Reservation();
@@ -45,6 +51,7 @@ public class ReservationController {
             reservation.setNombrePassager(nombrePassager);
             reservation.setDateArrivee(Timestamp.valueOf(dateArrivee.replace("T", " ") + ":00"));
             reservation.setHotelId(hotelId);
+            reservation.setAeroportId(aeroportId);
 
             reservationDAO.insert(reservation);
             mv.addData("success", "Réservation enregistrée avec succès !");
@@ -56,10 +63,32 @@ public class ReservationController {
         try {
             List<Hotel> hotels = hotelDAO.findAll();
             mv.addData("hotels", hotels);
+            List<Aeroport> aeroports = aeroportDAO.findAll();
+            mv.addData("aeroports", aeroports);
         } catch (Exception e) {
             // ignore
         }
 
+        return mv;
+    }
+
+    @GET("reservation/delete")
+    public ModelView delete(@RequestParam("id") int id) {
+        ModelView mv = new ModelView("reservation-form");
+        try {
+            reservationDAO.delete(id);
+            mv.addData("success", "Réservation supprimée avec succès !");
+        } catch (Exception e) {
+            mv.addData("error", "Erreur lors de la suppression : " + e.getMessage());
+        }
+        try {
+            List<Hotel> hotels = hotelDAO.findAll();
+            mv.addData("hotels", hotels);
+            List<Aeroport> aeroports = aeroportDAO.findAll();
+            mv.addData("aeroports", aeroports);
+        } catch (Exception e) {
+            // ignore
+        }
         return mv;
     }
 

@@ -5,10 +5,20 @@ public class Hotel {
     private String nom;
     private String adresse;
     private String ville;
-    private String telephone;
-    private double distanceAeroport;  // distance en km depuis l'aéroport
+    private int lieuxId;
+
+    // Champ calculé pour l'affichage
+    private String lieuxNom;
 
     public Hotel() {
+    }
+
+    public Hotel(int id, String nom, String adresse, String ville, int lieuxId) {
+        this.id = id;
+        this.nom = nom;
+        this.adresse = adresse;
+        this.ville = ville;
+        this.lieuxId = lieuxId;
     }
 
     public int getId() {
@@ -43,19 +53,19 @@ public class Hotel {
         this.ville = ville;
     }
 
-    public String getTelephone() {
-        return telephone;
+    public int getLieuxId() {
+        return lieuxId;
     }
 
-    public void setTelephone(String telephone) {
-        this.telephone = telephone;
+    public void setLieuxId(int lieuxId) {
+        this.lieuxId = lieuxId;
     }
 
-    public double getDistanceAeroport() {
-        return distanceAeroport;
+    public String getLieuxNom() {
+        return lieuxNom;
     }
 
-    public void setDistanceAeroport(double distanceAeroport) {
-        this.distanceAeroport = distanceAeroport;
+    public void setLieuxNom(String lieuxNom) {
+        this.lieuxNom = lieuxNom;
     }
 }

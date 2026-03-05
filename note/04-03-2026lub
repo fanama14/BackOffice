@@ -1,0 +1,49 @@
+afka aasina reservation aterina ao de miverina any am aeroport de , misy course hafa ndray , parametre considere tsy mila crud parametre insertion fotsiny , parametre: vitesse moyenne,temps,
+mila fatatra le distance parcouru, 120km exemple 30km adin izy tefaverina , afaka asignena izy apres an izay, 
+ampina table aeroport:id, code ,libelle
+script insertion table et donnees , script de reinitialisation et initialisation
+table distance:id, from ,to, kilometre(1,Ivato,Colb,13) (mitovy fona vis vers ca)
+inteface:backoffice :param date -> page planification, ny reservation d u voiture, depart @heure tafaverina@heure
+
+
+regle:rah manana res tsika @date 1 , de 08 ohtr a de iza no andefana anazy , le 11 , satri atsy atonona @7 izy , indivisible le cli=ent miaraka, de akaiky indrindra no asignena azy , rah mizy mitovy le nbr mitovy le place(de ze DIESEL no alefa)
+
+temps d attente:en minute
+apina  
+liste trajet->
+
+
+
+aeroport: id,code,libelle
+distance: id , from ,to ,kilometre
+parametre: vitesse moyene,temps attente
+
+1)script reinit et init avec donnees
+3)ajout id_vehicule table reservation
+4)creation reservation+gestion 
+5)page: liste vehicule, click, liste reservation vehicule etre 2 date+details
+
+TL:fana
+
+------------------------------------------------------------------------------------------------
+sprint-4
+raha meme date et heure d arrive(meme vol), afaka mapiharahana amle vehicule 1
+possible hotel 2 samy hafa (distance)
+izay akaikyn aeroport aloha no aterina(Ivato-30->colbert-40->Ibis->Ivato) mila modifier ilay table distance
+
+-simlulation:modifiena (table+code+test)
+-implementation regle gestion:possibilite regroupement pls client
+
+prompt:regle de gestion simulation et planification:
+dans le filtre entre les dates:on va afficher une simulation complete des reservations comprises entre les dates: on affiche : reservation,clients,nombre pers,date etheure arrive,date et heure retour(aeropt), vehicule;
+regles:
+0)si reservation a 6 personnes; et deux vehicules 7places et 8 places; on prend le 7; le plus proche ou egal aux nombre de personne
+1)si une reservation: 6 personnnes ; et deux vehicules  7 places diesel et essence->on prend diesel
+2)temps d attente:on attend x minitues (impact sur date heure arrive et retour)
+
+fana
+on peut regrouper des clients(reservations)
+3)si reservation 4 et une reservatioon a 2; on peut regrouper les 2 reservations dan vehicule 7 places
+4)les clientrs son indivisible : si reservation 4 et une reservatioon a 3; pn ne peut pas faire pour 7 places
+5)si 2 reservation groupees;exemple re1 ivato-40km->ibis ; re2 ivato-60km->colbert, on va vers ibis en premier ; donc ivato-40km->ibis-40km->colbert; donc on dois avoir dans la base touts les distances possibles puor les lieux
+6)si 2 reservation regoupe , memes distances , on va faire par ordre alphabetique; si l un : Ankadikely et l autre Tsiazompaniry, les 2 40km, on prend Ankadikely en premier,...

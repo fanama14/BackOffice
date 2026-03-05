@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-set TOMCAT_HOME=C:\xampp\tomcat
+set TOMCAT_HOME=C:\apache-tomcat-9.0.82\apache-tomcat-9.0.82
 set APP_NAME=BackOffice
 
 echo ========================================
