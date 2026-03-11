@@ -1,0 +1,15 @@
+temps d attente+regroupement
+rah misy vol tonga dans temps d attente -> regroupement
+raha tsy misy vol entre temps d attente de lasa fa tsy miandry(08h26)
+izay prochain vol indray no ampiana temps d attente
+sprint-4
+izay passger betsaka indrndra no alefa aloha
+
+modif sprint 4 
+on traite l a ssignation par les plus gros nombre de passageer(9->5->4 nombre de passager)
+
+a faire sprint 5
+modifie la regle 'temps d attente' par : avec des resercvations du meme jour : si reservation 1 : 08:00 , resa 2 : 08:18, resa 3 : 08:40, resa 4 : 09:00
+avec une temps d attente de 30 minutes , on commence a calculer la marge par la premiere heure de vol : resa 1
+donc on peut regrouper les vols entre 08:00 a 08:00+30mins tout en preservant les autres contraintes et regles de gestion ; puis on reclaclue la marge par la prochaine vol
+apres 08:00+30 mins : resa 3
