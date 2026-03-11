@@ -1,5 +1,8 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@ page import="java.util.List" %>
+<%@ page import="java.util.ArrayList" %>
+<%@ page import="java.util.LinkedHashMap" %>
+<%@ page import="java.util.Map" %>
 <%@ page import="com.backoffice.model.Reservation" %>
 <%@ page import="com.backoffice.model.Parametre" %>
 <%@ page import="java.text.SimpleDateFormat" %>
@@ -134,76 +137,100 @@
         .btn-primary:hover {
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
-        .btn-success {
-            background: linear-gradient(135deg, #2e7d32 0%, #4caf50 100%);
+        
+        /* Groupe card */
+        .groupe-card {
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        .groupe-header {
+            padding: 15px 20px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 25px;
+        }
+        .groupe-header-assigned {
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+            border-bottom: 2px solid #a5d6a7;
+        }
+        .groupe-header-pending {
+            background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+            border-bottom: 2px solid #ffcc80;
+        }
+        .groupe-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+        }
+        .groupe-info {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            color: #555;
+        }
+        .groupe-info strong {
+            color: #333;
+        }
+        .vehicule-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 700;
+        }
+        .vehicule-tag-assigned {
+            background: #2e7d32;
             color: white;
         }
-        .btn-success:hover {
-            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
-        }
-        .btn-danger {
-            background: linear-gradient(135deg, #c62828 0%, #e53935 100%);
+        .vehicule-tag-pending {
+            background: #e65100;
             color: white;
         }
-        .btn-danger:hover {
-            box-shadow: 0 5px 15px rgba(229, 57, 53, 0.4);
-        }
-        .btn-sm {
-            padding: 6px 12px;
-            font-size: 12px;
+        .horaire-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            background: white;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #333;
+            border: 1px solid #ccc;
         }
         
-        /* Table */
-        table {
+        /* Table dans la carte */
+        .groupe-card table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
         }
-        th, td {
-            padding: 12px 10px;
+        .groupe-card th, .groupe-card td {
+            padding: 10px 15px;
             text-align: left;
-            border-bottom: 1px solid #e0e0e0;
+            border-bottom: 1px solid #eee;
         }
-        th {
+        .groupe-card th {
             background: #f5f5f5;
             font-weight: 600;
             color: #333;
-            font-size: 13px;
+            font-size: 12px;
             text-transform: uppercase;
         }
-        tr:hover {
-            background: #f9f9f9;
+        .groupe-card tr:last-child td {
+            border-bottom: none;
         }
-        
-        /* États */
-        .status-assigned {
-            background: #e8f5e9;
-        }
-        .status-pending {
-            background: #fff3e0;
-        }
-        .vehicule-badge {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        .vehicule-assigned {
-            background: #c8e6c9;
-            color: #2e7d32;
-        }
-        .vehicule-pending {
-            background: #ffe0b2;
-            color: #e65100;
+        .groupe-card tr:hover {
+            background: #fafafa;
         }
         .time-display {
             font-family: 'Courier New', monospace;
             font-size: 13px;
-        }
-        .empty-cell {
-            color: #999;
-            font-style: italic;
         }
         
         /* Responsive */
@@ -211,18 +238,19 @@
             .container {
                 padding: 15px;
             }
-            table {
+            .groupe-card th, .groupe-card td {
+                padding: 8px 10px;
                 font-size: 13px;
             }
-            th, td {
-                padding: 8px 5px;
+            .groupe-header {
+                gap: 10px;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <a href="${pageContext.request.contextPath}/" class="back-link">← Retour au menu</a>
+        <a href="${pageContext.request.contextPath}/" class="back-link">&larr; Retour au menu</a>
         <h1>Planification des Transports</h1>
         
         <%
@@ -243,7 +271,7 @@
         %>
         <div class="params-info">
             <div class="param-item">
-                <span>Temps d'attente aéroport:</span>
+                <span>Temps d'attente a&eacute;roport:</span>
                 <strong><%= parametre.getTempsAttente() %> min</strong>
             </div>
             <div class="param-item">
@@ -257,7 +285,7 @@
         <div class="filters">
             <form method="get" action="${pageContext.request.contextPath}/planification">
                 <div class="filter-group">
-                    <label for="dateDebut">Date début</label>
+                    <label for="dateDebut">Date d&eacute;but</label>
                     <input type="date" id="dateDebut" name="dateDebut" 
                            value="<%= request.getAttribute("dateDebut") != null ? request.getAttribute("dateDebut") : "" %>">
                 </div>
@@ -270,73 +298,112 @@
             </form>
         </div>
         
-        <!-- Liste des réservations -->
+        <!-- Liste des réservations par groupe/véhicule -->
         <%
             List<Reservation> reservations = (List<Reservation>) request.getAttribute("reservations");
             SimpleDateFormat sdfDate = new SimpleDateFormat("dd/MM/yyyy");
             SimpleDateFormat sdfTime = new SimpleDateFormat("HH:mm");
             SimpleDateFormat sdfDateTime = new SimpleDateFormat("dd/MM/yyyy HH:mm");
-            String dateDebutParam = (String) request.getAttribute("dateDebut");
-            String dateFinParam = (String) request.getAttribute("dateFin");
         %>
         
         <% if (reservations != null && !reservations.isEmpty()) { %>
-        <table>
-            <thead>
-                <tr>
-                    <th>Réservation</th>
-                    <th>Client</th>
-                    <th>Nb Personnes</th>
-                    <th>Date/Heure Arrivée</th>
-                    <th>Hôtel</th>
-                    <th>Véhicule</th>
-                    <th>Distance (km)</th>
-                    <th>Départ Aéroport</th>
-                    <th>Retour Aéroport</th>
-                </tr>
-            </thead>
-            <tbody>
-                <% for (Reservation r : reservations) { 
-                    boolean hasVehicule = r.getVehiculeReference() != null;
-                %>
-                <tr class="<%= hasVehicule ? "status-assigned" : "status-pending" %>">
-                    <td><%= r.getId() %></td>
-                    <td><%= r.getClientId() %></td>
-                    <td><%= r.getNombrePassager() %></td>
-                    <td class="time-display"><%= sdfDateTime.format(r.getDateArrivee()) %></td>
-                    <td><%= r.getHotelNom() != null ? r.getHotelNom() : "-" %></td>
-                    <td>
-                        <% if (hasVehicule) { %>
-                            <span class="vehicule-badge vehicule-assigned">
-                                <%= r.getVehiculeReference() %>
-                                (<%= r.getVehiculeNombrePlace() %> pl. - <%= r.getVehiculeTypeCarburant() %>)
-                            </span>
-                        <% } else { %>
-                            <span class="vehicule-badge vehicule-pending">Aucun disponible</span>
-                        <% } %>
-                    </td>
-                    <td><%= r.getDistanceKm() > 0 ? (r.getDistanceKm() * 2) + " km" : "-" %></td>
-                    <td class="time-display">
-                        <% if (r.getHeureDepartAeroport() != null) { %>
-                            <%= sdfDateTime.format(r.getHeureDepartAeroport()) %>
-                        <% } else { %>
-                            <span class="empty-cell">-</span>
-                        <% } %>
-                    </td>
-                    <td class="time-display">
-                        <% if (r.getHeureRetourAeroport() != null) { %>
-                            <%= sdfDateTime.format(r.getHeureRetourAeroport()) %>
-                        <% } else { %>
-                            <span class="empty-cell">-</span>
-                        <% } %>
-                    </td>
-                </tr>
+        <%
+            // Regrouper les réservations par groupeId (ordre conservé)
+            LinkedHashMap<Integer, List<Reservation>> groupesMap = new LinkedHashMap<>();
+            for (Reservation r : reservations) {
+                int gid = r.getGroupeId();
+                if (!groupesMap.containsKey(gid)) {
+                    groupesMap.put(gid, new ArrayList<>());
+                }
+                groupesMap.get(gid).add(r);
+            }
+        %>
+        
+        <% for (Map.Entry<Integer, List<Reservation>> entry : groupesMap.entrySet()) {
+            int groupeId = entry.getKey();
+            List<Reservation> groupe = entry.getValue();
+            Reservation first = groupe.get(0);
+            boolean hasVehicule = first.getVehiculeReference() != null;
+            
+            // Total passagers du groupe
+            int totalPassagers = 0;
+            for (Reservation rr : groupe) {
+                totalPassagers += rr.getNombrePassager();
+            }
+        %>
+        <div class="groupe-card">
+            <!-- En-tête du groupe : véhicule + horaires -->
+            <div class="groupe-header <%= hasVehicule ? "groupe-header-assigned" : "groupe-header-pending" %>">
+                <span class="groupe-title">Groupe <%= groupeId %></span>
+                
+                <% if (hasVehicule) { %>
+                    <span class="vehicule-tag vehicule-tag-assigned">
+                        <%= first.getVehiculeReference() %> &mdash; <%= first.getVehiculeNombrePlace() %> places (<%= first.getVehiculeTypeCarburant() %>)
+                    </span>
+                <% } else { %>
+                    <span class="vehicule-tag vehicule-tag-pending">Aucun v&eacute;hicule disponible</span>
                 <% } %>
-            </tbody>
-        </table>
+                
+                <div class="groupe-info">
+                    <strong>Passagers:</strong> <%= totalPassagers %>
+                    <% if (hasVehicule) { %>
+                        / <%= first.getVehiculeNombrePlace() %> places
+                    <% } %>
+                </div>
+                
+                <% if (first.getHeureDepartAeroport() != null) { %>
+                <div class="groupe-info">
+                    <strong>D&eacute;part:</strong>
+                    <span class="horaire-tag"><%= sdfDateTime.format(first.getHeureDepartAeroport()) %></span>
+                </div>
+                <% } %>
+                
+                <% if (first.getHeureRetourAeroport() != null) { %>
+                <div class="groupe-info">
+                    <strong>Retour:</strong>
+                    <span class="horaire-tag"><%= sdfDateTime.format(first.getHeureRetourAeroport()) %></span>
+                </div>
+                <% } %>
+            </div>
+            
+            <!-- Tableau des réservations du groupe -->
+            <table>
+                <thead>
+                    <tr>
+                        <th>Ordre</th>
+                        <th>R&eacute;servation</th>
+                        <th>Client</th>
+                        <th>Nb Personnes</th>
+                        <th>Date/Heure Arriv&eacute;e</th>
+                        <th>H&ocirc;tel</th>
+                        <th>Distance (aller-retour)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% for (Reservation r : groupe) { %>
+                    <tr>
+                        <td>
+                            <strong><%= r.getOrdreLivraison() %></strong>
+                            <% if (r.getOrdreLivraison() == 1) { %>
+                                <span style="color:#2e7d32; font-size:11px;"> (1er)</span>
+                            <% } %>
+                        </td>
+                        <td><%= r.getId() %></td>
+                        <td><%= r.getClientId() %></td>
+                        <td><strong><%= r.getNombrePassager() %></strong></td>
+                        <td class="time-display"><%= sdfDateTime.format(r.getDateArrivee()) %></td>
+                        <td><%= r.getHotelNom() != null ? r.getHotelNom() : "-" %></td>
+                        <td><%= r.getDistanceKm() > 0 ? (r.getDistanceKm() * 2) + " km" : "-" %></td>
+                    </tr>
+                    <% } %>
+                </tbody>
+            </table>
+        </div>
+        <% } %>
+        
         <% } else { %>
             <p style="text-align: center; color: #666; padding: 40px;">
-                Aucune réservation trouvée pour cette période.
+                Aucune r&eacute;servation trouv&eacute;e pour cette p&eacute;riode.
             </p>
         <% } %>
     </div>

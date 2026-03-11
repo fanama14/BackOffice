@@ -22,6 +22,10 @@ public class Reservation {
     private Timestamp heureRetourAeroport;
     private double distanceKm;
 
+    // Champs de regroupement
+    private int groupeId;         // identifiant du groupe de regroupement
+    private int ordreLivraison;   // ordre de livraison dans le groupe (1 = livré en premier)
+
     public Reservation() {
     }
 
@@ -144,5 +148,21 @@ public class Reservation {
 
     public void setDistanceKm(double distanceKm) {
         this.distanceKm = distanceKm;
+    }
+
+    public int getGroupeId() {
+        return groupeId;
+    }
+
+    public void setGroupeId(int groupeId) {
+        this.groupeId = groupeId;
+    }
+
+    public int getOrdreLivraison() {
+        return ordreLivraison;
+    }
+
+    public void setOrdreLivraison(int ordreLivraison) {
+        this.ordreLivraison = ordreLivraison;
     }
 }
