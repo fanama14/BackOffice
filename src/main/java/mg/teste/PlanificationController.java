@@ -177,7 +177,7 @@ public class PlanificationController {
                 LinkedHashMap<Integer, Integer> remainingCapacity = new LinkedHashMap<>();
                 LinkedHashMap<Integer, Vehicule> vehiculeById = new LinkedHashMap<>();
                 LinkedHashMap<Integer, List<Reservation>> vehiculeResaMap = new LinkedHashMap<>();
-                
+                //
                 for (Vehicule v : allVehicles) {
                     if (!isVehiculeOccupe(occupations, v.getId(), heureDepart, heureRetourEstimee)) {
                         remainingCapacity.put(v.getId(), v.getNombrePlace());
