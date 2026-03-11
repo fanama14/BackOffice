@@ -23,6 +23,7 @@ public class GroupingService {
     private final HotelDAO hotelDAO;
     private final AeroportDAO aeroportDAO;
     private final DistanceDAO distanceDAO;
+    private int tempsAttenteMinutes = 30; // valeur par défaut, sera mise à jour depuis Parametre
 
     public GroupingService(VehiculeDAO vehiculeDAO, HotelDAO hotelDAO,
             AeroportDAO aeroportDAO, DistanceDAO distanceDAO) {
@@ -43,6 +44,9 @@ public class GroupingService {
             throws SQLException {
 
         List<ReservationGroup> groups = new ArrayList<>();
+
+        // Stocker le temps d'attente pour l'utiliser dans groupByTimeSlot
+        this.tempsAttenteMinutes = parametre.getTempsAttente();
 
         // Trier les réservations par date d'arrivée
         List<Reservation> sortedReservations = new ArrayList<>(reservations);
@@ -79,37 +83,89 @@ public class GroupingService {
     }
 
     /**
-     * Groupe les réservations par fenêtre temporelle (même vol)
+     * Groupe les réservations par fenêtre de temps d'attente glissante (Sprint 5).
+     *
+     * Règle :
+     * - On prend la première réservation (triée par heure d'arrivée) comme ancre.
+     * - On ouvre une fenêtre [heure_arrivée_ancre, heure_arrivée_ancre + temps_attente].
+     * - Toutes les réservations dont l'heure d'arrivée tombe dans cette fenêtre sont groupées.
+     * - La fenêtre suivante commence à la prochaine réservation APRÈS la fin de la fenêtre.
+     *
+     * Exemple avec temps_attente = 30 min :
+     *   resa 1: 08:00, resa 2: 08:18, resa 3: 08:40, resa 4: 09:00
+     *   Fenêtre 1: [08:00, 08:30] → resa 1 + resa 2
+     *   Fenêtre 2: [08:40, 09:10] → resa 3 + resa 4
      */
     private Map<String, List<Reservation>> groupByTimeSlot(List<Reservation> reservations) {
         Map<String, List<Reservation>> grouped = new LinkedHashMap<>();
 
-        for (Reservation r : reservations) {
-            // Clé basée sur date + heure (fenêtre de 30 minutes)
-            String timeSlotKey = getTimeSlotKey(r.getDateArrivee());
+        if (reservations.isEmpty()) {
+            return grouped;
+        }
 
-            grouped.computeIfAbsent(timeSlotKey, k -> new ArrayList<>()).add(r);
+        // D'abord, grouper les réservations par jour
+        Map<String, List<Reservation>> byDay = new LinkedHashMap<>();
+        for (Reservation r : reservations) {
+            String dayKey = String.format("%tF", r.getDateArrivee());
+            byDay.computeIfAbsent(dayKey, k -> new ArrayList<>()).add(r);
+        }
+
+        int windowIndex = 1;
+
+        for (Map.Entry<String, List<Reservation>> dayEntry : byDay.entrySet()) {
+            List<Reservation> dayReservations = dayEntry.getValue();
+            // Déjà triées par date d'arrivée (le tri global a été fait avant)
+
+            int i = 0;
+            while (i < dayReservations.size()) {
+                // L'ancre est la première réservation non encore assignée
+                Reservation anchor = dayReservations.get(i);
+                long anchorTime = anchor.getDateArrivee().getTime();
+                long windowEnd = anchorTime + (tempsAttenteMinutes * 60 * 1000L);
+
+                // Clé unique pour cette fenêtre
+                String slotKey = String.format("%tF_window_%d", anchor.getDateArrivee(), windowIndex);
+                List<Reservation> windowGroup = new ArrayList<>();
+                windowGroup.add(anchor);
+
+                int j = i + 1;
+                while (j < dayReservations.size()) {
+                    Reservation candidate = dayReservations.get(j);
+                    long candidateTime = candidate.getDateArrivee().getTime();
+
+                    if (candidateTime <= windowEnd) {
+                        // Cette réservation tombe dans la fenêtre → on l'ajoute
+                        windowGroup.add(candidate);
+                        j++;
+                    } else {
+                        // Cette réservation est après la fenêtre → nouvelle fenêtre
+                        break;
+                    }
+                }
+
+                grouped.put(slotKey, windowGroup);
+                windowIndex++;
+                i = j; // Avancer à la prochaine réservation non traitée
+            }
+        }
+
+        System.out.println("=== FENÊTRES DE TEMPS D'ATTENTE (Sprint 5) ===");
+        System.out.println("Temps d'attente: " + tempsAttenteMinutes + " minutes");
+        for (Map.Entry<String, List<Reservation>> entry : grouped.entrySet()) {
+            List<Reservation> slot = entry.getValue();
+            Reservation first = slot.get(0);
+            long windowEndMs = first.getDateArrivee().getTime() + (tempsAttenteMinutes * 60 * 1000L);
+            Timestamp windowEndTs = new Timestamp(windowEndMs);
+            System.out.println("Fenêtre '" + entry.getKey() + "': " +
+                    first.getDateArrivee() + " → " + windowEndTs +
+                    " (" + slot.size() + " réservation(s))");
+            for (Reservation r : slot) {
+                System.out.println("  - Résa #" + r.getId() + " arrivée: " + r.getDateArrivee() +
+                        " passagers: " + r.getNombrePassager());
+            }
         }
 
         return grouped;
-    }
-
-    /**
-     * Génère une clé pour identifier une fenêtre temporelle
-     */
-    private String getTimeSlotKey(Timestamp timestamp) {
-        Calendar cal = Calendar.getInstance();
-        cal.setTime(timestamp);
-
-        // Grouper toutes les réservations avec la même date et heure (même vol)
-        // On arrondit aux 15 minutes pour permettre un petit décalage
-        int minutes = cal.get(Calendar.MINUTE);
-        int roundedMinutes = (minutes / 15) * 15; // Arrondir aux 15 minutes
-
-        return String.format("%tF_%02d:%02d",
-                timestamp,
-                cal.get(Calendar.HOUR_OF_DAY),
-                roundedMinutes);
     }
 
     /**

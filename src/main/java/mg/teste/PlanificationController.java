@@ -19,7 +19,6 @@ import com.backoffice.model.Vehicule;
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,71 +72,87 @@ public class PlanificationController {
             // Récupérer les réservations de la période
             List<Reservation> reservations = reservationDAO.findByPeriode(tsDebut, tsFin);
             
-            // === REGROUPEMENT ===
-            // Trier par aéroport puis par date d'arrivée
-            reservations.sort((a, b) -> {
-                if (a.getAeroportId() != b.getAeroportId()) {
-                    return Integer.compare(a.getAeroportId(), b.getAeroportId());
-                }
-                return a.getDateArrivee().compareTo(b.getDateArrivee());
-            });
-            
-            // Regrouper les réservations du même aéroport avec exactement la même date/heure d'arrivée
+            // === REGROUPEMENT PAR FENÊTRE DE TEMPS D'ATTENTE GLISSANTE (Sprint 5) ===
+            // Règle : on prend la première réservation (par heure d'arrivée) comme ancre.
+            // On ouvre une fenêtre [ancre.dateArrivee, ancre.dateArrivee + tempsAttente].
+            // Toutes les réservations dont l'heure d'arrivée tombe dans cette fenêtre sont groupées.
+            // La fenêtre suivante commence à la prochaine réservation APRÈS la fin de la fenêtre.
+            //
+            // Exemple avec tempsAttente = 30 min :
+            //   resa 1: 08:00, resa 2: 08:18, resa 3: 08:40, resa 4: 09:00
+            //   Fenêtre 1: [08:00, 08:30] → resa 1 + resa 2
+            //   Fenêtre 2: [08:40, 09:10] → resa 3 + resa 4
+
+            // D'abord, grouper par aéroport puis par jour
+            Map<String, List<Reservation>> byAeroportAndDay = new LinkedHashMap<>();
+            for (Reservation r : reservations) {
+                String key = r.getAeroportId() + "_" + String.format("%tF", r.getDateArrivee());
+                byAeroportAndDay.computeIfAbsent(key, k -> new ArrayList<>()).add(r);
+            }
+
             List<List<Reservation>> groupes = new ArrayList<>();
-            List<Reservation> remaining = new ArrayList<>(reservations);
             int groupeIdCounter = 1;
-            
-            while (!remaining.isEmpty()) {
-                Reservation first = remaining.remove(0);
-                List<Reservation> groupe = new ArrayList<>();
-                groupe.add(first);
-                
-                Iterator<Reservation> it = remaining.iterator();
-                while (it.hasNext()) {
-                    Reservation r = it.next();
-                    if (r.getAeroportId() == first.getAeroportId()
-                            && r.getDateArrivee().getTime() == first.getDateArrivee().getTime()) {
-                        groupe.add(r);
-                        it.remove();
+
+            for (Map.Entry<String, List<Reservation>> dayEntry : byAeroportAndDay.entrySet()) {
+                List<Reservation> dayReservations = dayEntry.getValue();
+                // Trier par heure d'arrivée
+                dayReservations.sort((a, b) -> a.getDateArrivee().compareTo(b.getDateArrivee()));
+
+                int i = 0;
+                while (i < dayReservations.size()) {
+                    // L'ancre est la première réservation non encore assignée
+                    Reservation anchor = dayReservations.get(i);
+                    long anchorTime = anchor.getDateArrivee().getTime();
+                    long windowEnd = anchorTime + (parametre.getTempsAttente() * 60 * 1000L);
+
+                    List<Reservation> groupe = new ArrayList<>();
+                    groupe.add(anchor);
+
+                    int j = i + 1;
+                    while (j < dayReservations.size()) {
+                        Reservation candidate = dayReservations.get(j);
+                        if (candidate.getDateArrivee().getTime() <= windowEnd) {
+                            groupe.add(candidate);
+                            j++;
+                        } else {
+                            break;
+                        }
                     }
+
+                    // Trier le groupe par nombre de passagers décroissant (les plus gros en premier)
+                    groupe.sort((a, b) -> Integer.compare(b.getNombrePassager(), a.getNombrePassager()));
+
+                    // Assigner groupeId et ordreLivraison
+                    int ordre = 1;
+                    for (Reservation r : groupe) {
+                        r.setGroupeId(groupeIdCounter);
+                        r.setOrdreLivraison(ordre++);
+                    }
+
+                    groupes.add(groupe);
+                    groupeIdCounter++;
+                    i = j; // Avancer à la prochaine réservation hors fenêtre
                 }
-                
-                // Trier le groupe par nombre de passagers décroissant (les plus gros en premier)
-                groupe.sort((a, b) -> Integer.compare(b.getNombrePassager(), a.getNombrePassager()));
-                
-                // Assigner groupeId et ordreLivraison
-                int ordre = 1;
-                for (Reservation r : groupe) {
-                    r.setGroupeId(groupeIdCounter);
-                    r.setOrdreLivraison(ordre++);
-                }
-                
-                groupes.add(groupe);
-                groupeIdCounter++;
             }
             
-            // === ASSIGNATION DES VÉHICULES PAR BIN PACKING ===
-            // Pour chaque fenêtre temporelle, on assigne individuellement les réservations
-            // aux véhicules disponibles (un véhicule peut embarquer plusieurs réservations
-            // tant que le total de passagers <= nombre de places)
+            // === ASSIGNATION DES VÉHICULES PAR BEST-FIT (Sprint 5) ===
+            // Pour chaque fenêtre temporelle, on calcule le total de passagers du groupe
+            // et on assigne le véhicule dont la capacité est la plus proche (best-fit)
+            // Priorité carburant en cas d'égalité : D > ES > H > EL
             List<VehiculeOccupation> occupations = new ArrayList<>();
             
-            // Récupérer tous les véhicules, triés par capacité décroissante puis priorité carburant
+            // Récupérer tous les véhicules
             List<Vehicule> allVehicles = vehiculeDAO.findAll();
-            allVehicles.sort((a, b) -> {
-                if (a.getNombrePlace() != b.getNombrePlace()) {
-                    return Integer.compare(b.getNombrePlace(), a.getNombrePlace());
-                }
-                return Integer.compare(getCarburantPriority(a.getTypeCarburant()),
-                                       getCarburantPriority(b.getTypeCarburant()));
-            });
             
             List<List<Reservation>> finalGroupes = new ArrayList<>();
             groupeIdCounter = 1;
             
             for (List<Reservation> windowGroup : groupes) {
-                // Trier les réservations par nombre de passagers décroissant
-                windowGroup.sort((a, b) -> Integer.compare(b.getNombrePassager(), a.getNombrePassager()));
+                // Calculer le total de passagers pour ce groupe
+                int totalPassagers = 0;
+                for (Reservation r : windowGroup) {
+                    totalPassagers += r.getNombrePassager();
+                }
                 
                 // Première arrivée de la fenêtre
                 Timestamp firstArrival = windowGroup.get(0).getDateArrivee();
@@ -151,11 +166,13 @@ public class PlanificationController {
                 long heureDepartMs = firstArrival.getTime() + (parametre.getTempsAttente() * 60 * 1000L);
                 Timestamp heureDepart = new Timestamp(heureDepartMs);
                 
-                // Calculer les distances pour chaque réservation
+                // Calculer les distances et charger le nom d'hôtel pour chaque réservation
                 double maxDistanceKm = 0;
                 for (Reservation r : windowGroup) {
                     Hotel hotel = hotelDAO.findById(r.getHotelId());
                     if (hotel == null) continue;
+                    
+                    r.setHotelNom(hotel.getNom());
                     
                     Aeroport aeroport = aeroportDAO.findById(r.getAeroportId());
                     double distanceKm = 0;
@@ -168,89 +185,70 @@ public class PlanificationController {
                     }
                 }
                 
-                // Estimation conservatrice du retour (distance max de la fenêtre)
+                // Trier par distance croissante, puis alphabétique par nom d'hôtel si même distance
+                windowGroup.sort((a, b) -> {
+                    int distCmp = Double.compare(a.getDistanceKm(), b.getDistanceKm());
+                    if (distCmp != 0) return distCmp;
+                    String nomA = a.getHotelNom() != null ? a.getHotelNom() : "";
+                    String nomB = b.getHotelNom() != null ? b.getHotelNom() : "";
+                    return nomA.compareTo(nomB);
+                });
+                
+                // Calcul du temps de retour
                 int tempsTrajetMax = parametre.calculerTempsTrajet(maxDistanceKm);
-                long heureRetourEstimeeMs = heureDepartMs + (tempsTrajetMax * 60 * 1000L * 2);
-                Timestamp heureRetourEstimee = new Timestamp(heureRetourEstimeeMs);
+                long heureRetourMs = heureDepartMs + (tempsTrajetMax * 60 * 1000L * 2);
+                Timestamp heureRetour = new Timestamp(heureRetourMs);
                 
-                // Capacité restante par véhicule disponible pour cette fenêtre
-                LinkedHashMap<Integer, Integer> remainingCapacity = new LinkedHashMap<>();
-                LinkedHashMap<Integer, Vehicule> vehiculeById = new LinkedHashMap<>();
-                LinkedHashMap<Integer, List<Reservation>> vehiculeResaMap = new LinkedHashMap<>();
-                //
+                // Trouver le meilleur véhicule (best-fit) :
+                // capacité >= totalPassagers, le plus proche en capacité, puis priorité carburant
+                final int nbPassagers = totalPassagers;
+                List<Vehicule> candidats = new ArrayList<>();
                 for (Vehicule v : allVehicles) {
-                    if (!isVehiculeOccupe(occupations, v.getId(), heureDepart, heureRetourEstimee)) {
-                        remainingCapacity.put(v.getId(), v.getNombrePlace());
-                        vehiculeById.put(v.getId(), v);
+                    if (v.getNombrePlace() >= nbPassagers 
+                            && !isVehiculeOccupe(occupations, v.getId(), heureDepart, heureRetour)) {
+                        candidats.add(v);
                     }
                 }
-                
-                List<Reservation> unassigned = new ArrayList<>();
-                
-                // First-fit decreasing bin packing
-                for (Reservation r : windowGroup) {
-                    boolean assigned = false;
-                    for (Map.Entry<Integer, Integer> entry : remainingCapacity.entrySet()) {
-                        int vId = entry.getKey();
-                        int capaciteRestante = entry.getValue();
-                        if (capaciteRestante >= r.getNombrePassager()) {
-                            if (!vehiculeResaMap.containsKey(vId)) {
-                                vehiculeResaMap.put(vId, new ArrayList<>());
-                            }
-                            vehiculeResaMap.get(vId).add(r);
-                            remainingCapacity.put(vId, capaciteRestante - r.getNombrePassager());
-                            assigned = true;
-                            break;
-                        }
+                // Trier par best-fit : capacité la plus proche du total, puis priorité carburant
+                candidats.sort((a, b) -> {
+                    int diffA = a.getNombrePlace() - nbPassagers;
+                    int diffB = b.getNombrePlace() - nbPassagers;
+                    if (diffA != diffB) {
+                        return Integer.compare(diffA, diffB); // plus petit écart d'abord
                     }
-                    if (!assigned) {
-                        unassigned.add(r);
-                    }
-                }
+                    return Integer.compare(getCarburantPriority(a.getTypeCarburant()),
+                                           getCarburantPriority(b.getTypeCarburant()));
+                });
                 
-                // Créer les groupes par véhicule
-                for (Map.Entry<Integer, List<Reservation>> entry : vehiculeResaMap.entrySet()) {
-                    int vId = entry.getKey();
-                    Vehicule v = vehiculeById.get(vId);
-                    List<Reservation> resasInVehicle = entry.getValue();
-                    
-                    // Calcul du retour basé sur la distance max de CE véhicule
-                    double vMaxDist = 0;
-                    for (Reservation r : resasInVehicle) {
-                        if (r.getDistanceKm() > vMaxDist) {
-                            vMaxDist = r.getDistanceKm();
-                        }
-                    }
-                    int vTempsTrajet = parametre.calculerTempsTrajet(vMaxDist);
-                    long vHeureRetourMs = heureDepartMs + (vTempsTrajet * 60 * 1000L * 2);
-                    Timestamp vHeureRetour = new Timestamp(vHeureRetourMs);
+                if (!candidats.isEmpty()) {
+                    Vehicule bestVehicule = candidats.get(0);
                     
                     int ordre = 1;
-                    for (Reservation r : resasInVehicle) {
+                    for (Reservation r : windowGroup) {
                         r.setGroupeId(groupeIdCounter);
                         r.setOrdreLivraison(ordre++);
                         r.setHeureDepartAeroport(heureDepart);
-                        r.setHeureRetourAeroport(vHeureRetour);
-                        r.setVehiculeReference(v.getReference());
-                        r.setVehiculeTypeCarburant(v.getTypeCarburantLibelle());
-                        r.setVehiculeNombrePlace(v.getNombrePlace());
+                        r.setHeureRetourAeroport(heureRetour);
+                        r.setVehiculeReference(bestVehicule.getReference());
+                        r.setVehiculeTypeCarburant(bestVehicule.getTypeCarburantLibelle());
+                        r.setVehiculeNombrePlace(bestVehicule.getNombrePlace());
                     }
                     
-                    occupations.add(new VehiculeOccupation(vId, heureDepart, vHeureRetour));
-                    finalGroupes.add(resasInVehicle);
+                    occupations.add(new VehiculeOccupation(bestVehicule.getId(), heureDepart, heureRetour));
+                    finalGroupes.add(windowGroup);
                     groupeIdCounter++;
-                }
-                
-                // Groupe des réservations sans véhicule
-                if (!unassigned.isEmpty()) {
+                } else {
+                    // Aucun véhicule disponible avec assez de places
+                    // Essayer de splitter le groupe en sous-groupes
+                    // Pour l'instant, marquer comme sans véhicule
                     int ordre = 1;
-                    for (Reservation r : unassigned) {
+                    for (Reservation r : windowGroup) {
                         r.setGroupeId(groupeIdCounter);
                         r.setOrdreLivraison(ordre++);
                         r.setHeureDepartAeroport(heureDepart);
                         r.setHeureRetourAeroport(null);
                     }
-                    finalGroupes.add(unassigned);
+                    finalGroupes.add(windowGroup);
                     groupeIdCounter++;
                 }
             }
