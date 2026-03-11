@@ -284,6 +284,8 @@
         <table>
             <thead>
                 <tr>
+                    <th>Groupe</th>
+                    <th>Ordre</th>
                     <th>Réservation</th>
                     <th>Client</th>
                     <th>Nb Personnes</th>
@@ -296,13 +298,29 @@
                 </tr>
             </thead>
             <tbody>
-                <% for (Reservation r : reservations) { 
+                <% 
+                int prevGroupe = -1;
+                for (Reservation r : reservations) { 
                     boolean hasVehicule = r.getVehiculeReference() != null;
+                    boolean isNewGroupe = (r.getGroupeId() != prevGroupe);
+                    String groupeColor = (r.getGroupeId() % 2 == 0) ? "#f0f4ff" : "#fff8f0";
+                    prevGroupe = r.getGroupeId();
                 %>
-                <tr class="<%= hasVehicule ? "status-assigned" : "status-pending" %>">
+                <tr class="<%= hasVehicule ? "status-assigned" : "status-pending" %>" style="background-color: <%= groupeColor %>;">
+                    <td>
+                        <% if (isNewGroupe) { %>
+                            <span style="font-weight:bold; color:#667eea;">G<%= r.getGroupeId() %></span>
+                        <% } %>
+                    </td>
+                    <td>
+                        <span style="font-weight:bold;"><%= r.getOrdreLivraison() %></span>
+                        <% if (r.getOrdreLivraison() == 1) { %>
+                            <span style="color:#2e7d32; font-size:11px;"> (1er)</span>
+                        <% } %>
+                    </td>
                     <td><%= r.getId() %></td>
                     <td><%= r.getClientId() %></td>
-                    <td><%= r.getNombrePassager() %></td>
+                    <td><strong><%= r.getNombrePassager() %></strong></td>
                     <td class="time-display"><%= sdfDateTime.format(r.getDateArrivee()) %></td>
                     <td><%= r.getHotelNom() != null ? r.getHotelNom() : "-" %></td>
                     <td>
