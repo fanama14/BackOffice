@@ -9,9 +9,9 @@
 -- Table LIEUX
 -- ============================
 \c postgres;
-DROP DATABASE IF EXISTS sprint_4;
-CREATE DATABASE sprint_4;
-\c sprint_4;
+DROP DATABASE IF EXISTS sprint_5;
+CREATE DATABASE sprint_5;
+\c sprint_5;
 CREATE TABLE lieux (
     id SERIAL PRIMARY KEY,
     lieu VARCHAR(150) NOT NULL
@@ -117,102 +117,62 @@ CREATE TABLE reservation (
 -- Lieux
 INSERT INTO lieux (lieu) VALUES
 ('Nosy Be'),
-('Antananarivo'),
-('Antsiranana'),
-('Fianarantsoa'),
-('Aéroport Fascène'),
-('Aéroport Ivato'),
-('Aéroport Arrachart'),
-('Aéroport Fianarantsoa');
+('Antananarivo');
 
 -- Hotels
 INSERT INTO hotel (nom, adresse, ville, lieux_id) VALUES
-('Ocean View Hotel', 'Rue des Cocotiers', 'Nosy Be', 1),
-('Capital Lodge', 'Avenue de France', 'Antananarivo', 2),
-('Palm Resort', 'Plage de Ramena', 'Antsiranana', 3),
-('Highland Inn', 'Route d''Andranomena', 'Fianarantsoa', 4),
-('Lagoon Palace', 'Baie d''Ambatoloaka', 'Nosy Be', 1);
+('hotel1', 'Rue des Cocotiers', 'Nosy Be', 1);
 
 -- Aeroports
 INSERT INTO aeroport (code, libelle, lieux_id) VALUES
-('TNR', 'Aéroport International d''Ivato', 6);
+('TNR', 'Aéroport International d''Ivato', 2);
 
 -- Vehicules
 INSERT INTO vehicule (reference, nombre_place, type_carburant) VALUES
-('VH-001', 5, 'ES'),
-('VH-002', 7, 'D'),
-('VH-003', 4, 'EL'),
-('VH-004', 5, 'H'),
-('VH-005', 9, 'D');
+('VH-001', 12, 'D'),
+('VH-002', 5, 'ES'),
+('VH-003', 5, 'D'),
+('VH-004', 12, 'ES');
 
 -- Parametre
-INSERT INTO parametre (temps_attente, vitesse_moyenne) VALUES (30, 30);
+INSERT INTO parametre (temps_attente, vitesse_moyenne) VALUES (30, 50);
 
--- Distances (toutes les combinaisons entre tous les lieux)
+-- Distances (une seule entrée par paire, bidirectionnelle)
 -- 1=Nosy Be, 2=Antananarivo, 3=Antsiranana, 4=Fianarantsoa
 -- 5=Aéroport Fascène, 6=Aéroport Ivato, 7=Aéroport Arrachart, 8=Aéroport Fianarantsoa
 INSERT INTO distance (lieux_from, lieux_to, valeur) VALUES
 
 -- === Ville <-> Ville ===
-(1, 2, 600),   -- Nosy Be -> Antananarivo
-(2, 1, 600),   -- Antananarivo -> Nosy Be
-(1, 3, 250),   -- Nosy Be -> Antsiranana
-(3, 1, 250),   -- Antsiranana -> Nosy Be
-(1, 4, 1000),  -- Nosy Be -> Fianarantsoa
-(4, 1, 1000),  -- Fianarantsoa -> Nosy Be
-(2, 3, 700),   -- Antananarivo -> Antsiranana
-(3, 2, 700),   -- Antsiranana -> Antananarivo
-(2, 4, 400),   -- Antananarivo -> Fianarantsoa
-(4, 2, 400),   -- Fianarantsoa -> Antananarivo
-(3, 4, 1100),  -- Antsiranana -> Fianarantsoa
-(4, 3, 1100),  -- Fianarantsoa -> Antsiranana
+(1, 2, 50);   -- Nosy Be <-> Antananarivo
 
--- === Aéroport <-> Ville locale ===
-(5, 1, 15),    -- Aéroport Fascène -> Nosy Be
-(1, 5, 15),    -- Nosy Be -> Aéroport Fascène
-(6, 2, 20),    -- Aéroport Ivato -> Antananarivo
-(2, 6, 20),    -- Antananarivo -> Aéroport Ivato
-(7, 3, 8),     -- Aéroport Arrachart -> Antsiranana
-(3, 7, 8),     -- Antsiranana -> Aéroport Arrachart
-(8, 4, 12),    -- Aéroport Fianarantsoa -> Fianarantsoa
-(4, 8, 12),    -- Fianarantsoa -> Aéroport Fianarantsoa
+-- reservations
+INSERT INTO reservation (client_id, nombre_passager, date_arrivee, hotel_id, aeroport_id) VALUES
+('client1', 7,  '2026-03-12 09:00:00', 1, 1),
+('client2', 11, '2026-03-12 09:00:00', 1, 1),
+('client3', 3,  '2026-03-12 09:00:00', 1, 1),
+('Client4', 1,  '2026-03-12 09:00:00', 1, 1),
+('client5', 2,  '2026-03-12 09:00:00', 1, 1),
+('client6', 20, '2026-03-12 09:00:00', 1, 1);
 
--- === Ville <-> Aéroport distant ===
-(1, 6, 620),   -- Nosy Be -> Aéroport Ivato
-(6, 1, 620),   -- Aéroport Ivato -> Nosy Be
-(1, 7, 258),   -- Nosy Be -> Aéroport Arrachart
-(7, 1, 258),   -- Aéroport Arrachart -> Nosy Be
-(1, 8, 1012),  -- Nosy Be -> Aéroport Fianarantsoa
-(8, 1, 1012),  -- Aéroport Fianarantsoa -> Nosy Be
-(2, 5, 615),   -- Antananarivo -> Aéroport Fascène
-(5, 2, 615),   -- Aéroport Fascène -> Antananarivo
-(2, 7, 708),   -- Antananarivo -> Aéroport Arrachart
-(7, 2, 708),   -- Aéroport Arrachart -> Antananarivo
-(2, 8, 412),   -- Antananarivo -> Aéroport Fianarantsoa
-(8, 2, 412),   -- Aéroport Fianarantsoa -> Antananarivo
-(3, 5, 265),   -- Antsiranana -> Aéroport Fascène
-(5, 3, 265),   -- Aéroport Fascène -> Antsiranana
-(3, 6, 720),   -- Antsiranana -> Aéroport Ivato
-(6, 3, 720),   -- Aéroport Ivato -> Antsiranana
-(3, 8, 1112),  -- Antsiranana -> Aéroport Fianarantsoa
-(8, 3, 1112),  -- Aéroport Fianarantsoa -> Antsiranana
-(4, 5, 1015),  -- Fianarantsoa -> Aéroport Fascène
-(5, 4, 1015),  -- Aéroport Fascène -> Fianarantsoa
-(4, 6, 420),   -- Fianarantsoa -> Aéroport Ivato
-(6, 4, 420),   -- Aéroport Ivato -> Fianarantsoa
-(4, 7, 1108),  -- Fianarantsoa -> Aéroport Arrachart
-(7, 4, 1108),  -- Aéroport Arrachart -> Fianarantsoa
+-- ============================
+-- Table PLANIFICATION
+-- ============================
+CREATE TABLE planification (
+    id SERIAL PRIMARY KEY,
+    reservation_id INTEGER NOT NULL,
+    vehicule_id INTEGER,
+    groupe_id INTEGER NOT NULL,
+    ordre_livraison INTEGER,
+    heure_depart TIMESTAMP,
+    heure_retour TIMESTAMP,
 
--- === Aéroport <-> Aéroport ===
-(5, 6, 635),   -- Aéroport Fascène -> Aéroport Ivato
-(6, 5, 635),   -- Aéroport Ivato -> Aéroport Fascène
-(5, 7, 273),   -- Aéroport Fascène -> Aéroport Arrachart
-(7, 5, 273),   -- Aéroport Arrachart -> Aéroport Fascène
-(5, 8, 1027),  -- Aéroport Fascène -> Aéroport Fianarantsoa
-(8, 5, 1027),  -- Aéroport Fianarantsoa -> Aéroport Fascène
-(6, 7, 728),   -- Aéroport Ivato -> Aéroport Arrachart
-(7, 6, 728),   -- Aéroport Arrachart -> Aéroport Ivato
-(6, 8, 432),   -- Aéroport Ivato -> Aéroport Fianarantsoa
-(8, 6, 432),   -- Aéroport Fianarantsoa -> Aéroport Ivato
-(7, 8, 1120),  -- Aéroport Arrachart -> Aéroport Fianarantsoa
-(8, 7, 1120);  -- Aéroport Fianarantsoa -> Aéroport Arrachart
+    CONSTRAINT fk_planification_reservation
+        FOREIGN KEY (reservation_id)
+        REFERENCES reservation(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_planification_vehicule
+        FOREIGN KEY (vehicule_id)
+        REFERENCES vehicule(id)
+        ON DELETE SET NULL
+);
