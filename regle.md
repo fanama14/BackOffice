@@ -1,23 +1,43 @@
-SCENARIOS :
-client2 4
+REGLES METIER - PLANIFICATION TRANSPORT
 
-V3 12 essence client3 8, paces restes : 4
-V1 14 diesel client1 9, places restes : 5
-V2 4 diesel
+1. OBJECTIF
+- Assigner les reservations a des vehicules selon des regles de priorite.
+- Enregistrer le resultat dans la table de planification.
 
-Voici les nouvelles regles et fonctionnalites : ASSIGNATION VEHICULE :
-On stocke la planification dans une table
+2. ORDRE DE TRAITEMENT DES CLIENTS
+- Dans une fenetre de temps d'attente, les clients sont traites par ordre decroissant du nombre de passagers.
+- Exemple: client1=4, client2=6, client3=2 -> ordre de traitement: client2, client1, client3.
 
-On assigne les clients au vehicule par ordre decroissant du nb passagers : client1 4 passagers, client2 6 passagers, client3 2 passagers, on assigne le client2 en premier, puis client1 et finalement client3.
+3. PRIORITE DES REGLES D'ASSIGNATION
+- Regle 1: NB_PLACES >= NB_PASSAGERS (contrainte obligatoire).
+- Regle 2: REMPLIR VEHICULE.
+	Si un vehicule deja ouvert dans la fenetre a assez de places restantes, on y met le client en priorite.
+	Dans ce cas, on ne regarde pas encore la proximite de capacite, le nombre de trajets, ni le carburant.
+- Regle 3: NB PLACES LE PLUS PROCHE DU NB PASSAGERS.
+- Regle 4: VEHICULE AVEC LE MOINS DE TRAJETS.
+	Exemple: V1 fait aeroport > hotel1 > hotel2 > aeroport, V2 fait aeroport > hotel1 > aeroport -> V2 est prioritaire.
+- Regle 5: TYPE CARBURANT (priorite): diesel > essence > hybride > electrique.
 
-*Priorite des regles de gestion :
--NB PLACES >= NB PASSAGERS
--REMPLIR VEHICULE : si nb places restant >= nb passagers (on ne regarde pas encore nb places plus proche de nb passagers, on ne regarde pas nb de trajet, on ne regarde pas carburant, on remplit)
--NB PLACES LE PLUS PROCHE DU NB PASSAGERS
--VEHICULE AVEC LE MOINS DE TRAJET : trajet de V1 : aeorport > hotetl1 > hotel2 > aeroport, trajet V2 : aeroport > hotel1 > aeroport, alors c'est V2 qu'on choisit
--CARBURANT : diesel > essence > hybride > electrique
+4. DISPONIBILITE DES VEHICULES
+- Un vehicule est disponible des qu'il est revenu a l'aeroport (heure de retour atteinte).
+- La verification de disponibilite se fait par rapport a l'heure de depart potentielle du groupe
+	(dernier client assigne dans la fenetre), et pas uniquement a l'heure d'ancrage de la fenetre.
 
-*Disponibilite :
-CONSIDERATION DE L'HEURE D'ARRIVEE a l'aeroport du vehicule (le vehicule est disponible), MAIS CONSIDERATION DE TEMPS ATTENTE : debut temps attente : heure date_arrivee de la premiere reservation d'une date, puis premiere reservation apres le dernier temps d'attente, ainsi de suite ...
+5. GESTION DES FENETRES DE TEMPS D'ATTENTE
+- Debut de la premiere fenetre: heure d'arrivee de la premiere reservation du jour.
+- Duree de la fenetre: parametre temps_attente (ex: 30 minutes).
+- Fenetre suivante: demarre a la premiere reservation strictement apres la fin de la fenetre precedente.
+- Si des clients ne sont pas assignes dans une fenetre, ils attendent la fenetre suivante.
+- Meme si un vehicule revient entre-temps, on ne cree pas de fenetre intermediaire sans nouvelle reservation ancre.
 
-Ex : temps attente : 30 minutes, premiere resa de 12/03/2026 client1 : 07:15, premier temps attente : 07:15-07:45 donc REGROUPEMENT : client1 07:15, client2 07:25, client3 07:30, client4 07:40, client5 07:45, client1 et client4 n'ont pas trouve de vehicule, client2 va dans V1 et client3 et client4 va dans V2, le depart des 2 vehicules est a 07:40 (le dernier client assigne pendant ce temps d'attente). Puis client1 et client5 attendent la prochaine reservation pour le nouveau temps d'attente meme si il y a une vehocule qui retourne et arrive a l'aeroport ou est a l'aeroport avant cette prochaine reservation, si V1 retourne a 8:30 et que meme si ce vehicule est adequat a client1 ou client4 et que la prochaine reservation est a 9:20, client1 et client4 doivent attendre le nouveau temps d'attente 9:20-9:50. Tout ca en respectant les regles de gestions.
+6. EXEMPLE DE FENETRE
+- Temps attente = 30 min.
+- Premiere reservation du 12/03/2026 a 07:15 -> fenetre 07:15-07:45.
+- Le depart des vehicules assignes dans cette fenetre se fait a l'heure du dernier client assigne de la fenetre.
+- Les clients non assignes attendent la fenetre suivante ancree par la prochaine reservation.
+
+7. CAS IMPORTANT (IMAGE FOURNIE)
+- Si VH-001 est deja utilise, puis revient a l'aeroport avant ou a l'heure de depart du groupe suivant,
+	alors VH-001 peut etre reutilise.
+- Donc les 3 dernieres reservations ne doivent pas rester en "Aucun vehicule disponible"
+	si VH-001 est redevenu disponible au moment du depart reel de leur groupe.

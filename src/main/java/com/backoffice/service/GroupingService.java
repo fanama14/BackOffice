@@ -16,16 +16,18 @@ import java.util.*;
  * ASSIGNATION PAR ORDRE DÉCROISSANT DU NB PASSAGERS.
  *
  * Priorité des règles :
- *  1. NB PLACES >= NB PASSAGERS (contrainte dure)
- *  2. REMPLIR VÉHICULE : si un véhicule déjà assigné a assez de places restantes, on y met le client
- *  3. NB PLACES LE PLUS PROCHE DU NB PASSAGERS
- *  4. VÉHICULE AVEC LE MOINS DE TRAJETS
- *  5. CARBURANT : D > ES > H > EL
+ * 1. NB PLACES >= NB PASSAGERS (contrainte dure)
+ * 2. REMPLIR VÉHICULE : si un véhicule déjà assigné a assez de places
+ * restantes, on y met le client
+ * 3. NB PLACES LE PLUS PROCHE DU NB PASSAGERS
+ * 4. VÉHICULE AVEC LE MOINS DE TRAJETS
+ * 5. CARBURANT : D > ES > H > EL
  *
  * DISPONIBILITÉ :
- *  - Fenêtre de temps d'attente glissante
- *  - Départ = heure d'arrivée du dernier client assigné dans la fenêtre
- *  - Clients non assignés attendent la prochaine réservation pour une nouvelle fenêtre
+ * - Fenêtre de temps d'attente glissante
+ * - Départ = heure d'arrivée du dernier client assigné dans la fenêtre
+ * - Clients non assignés attendent la prochaine réservation pour une nouvelle
+ * fenêtre
  */
 public class GroupingService {
     private final VehiculeDAO vehiculeDAO;
@@ -48,7 +50,8 @@ public class GroupingService {
             throws SQLException {
 
         List<ReservationGroup> allGroups = new ArrayList<>();
-        if (reservations.isEmpty()) return allGroups;
+        if (reservations.isEmpty())
+            return allGroups;
 
         int tempsAttenteMin = parametre.getTempsAttente();
         List<Vehicule> allVehicules = vehiculeDAO.findAll();
@@ -112,6 +115,17 @@ public class GroupingService {
                 windowClients.addAll(unassigned);
                 windowClients.addAll(windowNew);
 
+                // Référence de départ potentielle de la fenêtre :
+                // le dernier client de la fenêtre en termes d'heure d'arrivée.
+                // Permet de réutiliser un véhicule qui revient avant ce départ.
+                long windowDepartureReference = anchorTime;
+                for (Reservation r : windowClients) {
+                    long t = r.getDateArrivee().getTime();
+                    if (t > windowDepartureReference) {
+                        windowDepartureReference = t;
+                    }
+                }
+
                 // Trier par nb passagers décroissant
                 windowClients.sort((a, b) -> Integer.compare(b.getNombrePassager(), a.getNombrePassager()));
 
@@ -144,9 +158,12 @@ public class GroupingService {
                         // RÈGLES 3-5 : trouver un nouveau véhicule
                         List<Vehicule> candidates = new ArrayList<>();
                         for (Vehicule v : allVehicules) {
-                            if (v.getNombrePlace() < nbPassagers) continue;
-                            if (vehicleStates.containsKey(v.getId())) continue;
-                            if (isOccupied(occupations, v.getId(), anchorTime)) continue;
+                            if (v.getNombrePlace() < nbPassagers)
+                                continue;
+                            if (vehicleStates.containsKey(v.getId()))
+                                continue;
+                            if (isOccupied(occupations, v.getId(), windowDepartureReference))
+                                continue;
                             candidates.add(v);
                         }
 
@@ -156,11 +173,13 @@ public class GroupingService {
                                 // Règle 3 : capacité la plus proche
                                 int diffA = a.getNombrePlace() - np;
                                 int diffB = b.getNombrePlace() - np;
-                                if (diffA != diffB) return Integer.compare(diffA, diffB);
+                                if (diffA != diffB)
+                                    return Integer.compare(diffA, diffB);
                                 // Règle 4 : moins de trajets
                                 int tripsA = countTrips(occupations, a.getId());
                                 int tripsB = countTrips(occupations, b.getId());
-                                if (tripsA != tripsB) return Integer.compare(tripsA, tripsB);
+                                if (tripsA != tripsB)
+                                    return Integer.compare(tripsA, tripsB);
                                 // Règle 5 : carburant D > ES > H > EL
                                 return Integer.compare(fuelPriority(a.getTypeCarburant()),
                                         fuelPriority(b.getTypeCarburant()));
@@ -231,11 +250,13 @@ public class GroupingService {
     private void loadReservationInfo(Reservation r) throws SQLException {
         if (r.getHotelNom() == null) {
             Hotel hotel = hotelDAO.findById(r.getHotelId());
-            if (hotel != null) r.setHotelNom(hotel.getNom());
+            if (hotel != null)
+                r.setHotelNom(hotel.getNom());
         }
         if (r.getAeroportNom() == null) {
             Aeroport aeroport = aeroportDAO.findById(r.getAeroportId());
-            if (aeroport != null) r.setAeroportNom(aeroport.getLibelle());
+            if (aeroport != null)
+                r.setAeroportNom(aeroport.getLibelle());
         }
         if (r.getDistanceKm() <= 0) {
             Hotel hotel = hotelDAO.findById(r.getHotelId());
@@ -248,10 +269,12 @@ public class GroupingService {
     }
 
     private double calculateRouteDistance(List<Reservation> clients) throws SQLException {
-        if (clients.isEmpty()) return 0;
+        if (clients.isEmpty())
+            return 0;
 
         Aeroport aeroport = aeroportDAO.findById(clients.get(0).getAeroportId());
-        if (aeroport == null) return 0;
+        if (aeroport == null)
+            return 0;
         int aeroportLieuxId = aeroport.getLieuxId();
 
         List<Integer> stopLieuxIds = new ArrayList<>();
@@ -266,7 +289,8 @@ public class GroupingService {
             }
         }
 
-        if (stopLieuxIds.isEmpty()) return 0;
+        if (stopLieuxIds.isEmpty())
+            return 0;
 
         // Trier par distance depuis l'aéroport (plus proche d'abord)
         final int aLieuxId = aeroportLieuxId;
@@ -303,19 +327,26 @@ public class GroupingService {
     private int countTrips(List<VehiculeOccupation> occupations, int vehiculeId) {
         int count = 0;
         for (VehiculeOccupation occ : occupations) {
-            if (occ.vehiculeId == vehiculeId) count++;
+            if (occ.vehiculeId == vehiculeId)
+                count++;
         }
         return count;
     }
 
     private int fuelPriority(String type) {
-        if (type == null) return 5;
+        if (type == null)
+            return 5;
         switch (type) {
-            case "D": return 1;
-            case "ES": return 2;
-            case "H": return 3;
-            case "EL": return 4;
-            default: return 5;
+            case "D":
+                return 1;
+            case "ES":
+                return 2;
+            case "H":
+                return 3;
+            case "EL":
+                return 4;
+            default:
+                return 5;
         }
     }
 
