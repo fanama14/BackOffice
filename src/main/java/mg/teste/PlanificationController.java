@@ -65,7 +65,8 @@ public class PlanificationController {
             List<Reservation> reservations = reservationDAO.findByPeriode(tsDebut, tsFin);
 
             // Planifier via le service (nouvelles règles d'assignation)
-            GroupingService service = new GroupingService(vehiculeDAO, hotelDAO, aeroportDAO, distanceDAO, planificationDAO);
+            GroupingService service = new GroupingService(vehiculeDAO, hotelDAO, aeroportDAO, distanceDAO,
+                    planificationDAO);
             List<ReservationGroup> groups = service.planifier(reservations, parametre);
 
             // Aplatir les groupes en liste de réservations pour la JSP

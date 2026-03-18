@@ -111,8 +111,17 @@ public class GroupingService {
                 windowClients.addAll(unassigned);
                 windowClients.addAll(windowNew);
 
-                // Trier par nb passagers décroissant
-                windowClients.sort((a, b) -> Integer.compare(b.getNombrePassager(), a.getNombrePassager()));
+                // Priorité absolue aux reliquats issus d'un split, puis nb passagers décroissant
+                windowClients.sort((a, b) -> {
+                    if (a.isPrioriteAssignation() != b.isPrioriteAssignation()) {
+                        return a.isPrioriteAssignation() ? -1 : 1;
+                    }
+                    int byPassengers = Integer.compare(b.getNombrePassager(), a.getNombrePassager());
+                    if (byPassengers != 0) {
+                        return byPassengers;
+                    }
+                    return a.getDateArrivee().compareTo(b.getDateArrivee());
+                });
 
                 // Charger les infos hôtel / aéroport / distance
                 for (Reservation r : windowClients) {
@@ -212,7 +221,9 @@ public class GroupingService {
                     }
 
                     if (remainingPassengers > 0) {
-                        nextUnassigned.add(splitReservation(client, remainingPassengers));
+                        Reservation remainder = splitReservation(client, remainingPassengers);
+                        remainder.setPrioriteAssignation(true);
+                        nextUnassigned.add(remainder);
                     }
                 }
 
@@ -389,6 +400,7 @@ public class GroupingService {
         split.setHotelNom(source.getHotelNom());
         split.setAeroportNom(source.getAeroportNom());
         split.setDistanceKm(source.getDistanceKm());
+        split.setPrioriteAssignation(source.isPrioriteAssignation());
 
         return split;
     }
