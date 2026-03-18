@@ -12,9 +12,9 @@ Ce système implémente la fonctionnalité de regroupement de réservations selo
    - ✓ Exemple valide: Réservation de 4 personnes + Réservation de 2 personnes = 6 personnes dans un véhicule 7 places
    - Le total des passagers doit être inférieur (pas égal) à la capacité du véhicule
 
-3. **Clients indivisibles**: 
-   - Les groupes de clients ne peuvent pas être séparés
-   - Exemple: Réservation de 4 + Réservation de 3 ne peuvent pas être dans un véhicule 7 places (4+3=7)
+3. **Split de réservation autorisé**: 
+   - Une réservation peut être découpée en plusieurs sous-groupes de passagers
+   - Exemple: Réservation de 7 passagers peut être répartie en 4 + 3 sur deux véhicules différents
 
 4. **Ordre de visite**: 
    - Les hôtels sont visités dans l'ordre de distance (le plus proche en premier)
@@ -101,9 +101,10 @@ Les réservations sont groupées par fenêtre de 30 minutes basée sur l'heure d
 Pour chaque fenêtre temporelle:
 1. Trier les réservations par nombre de passagers (décroissant)
 2. Pour chaque réservation non assignée:
-   - Créer un nouveau groupe
-   - Essayer d'ajouter d'autres réservations compatibles
-   - Vérifier: total_passagers < capacité_véhicule
+   - Remplir d'abord les véhicules déjà ouverts dans la fenêtre
+   - Si nécessaire, ouvrir un ou plusieurs nouveaux véhicules
+   - Découper la réservation en portions si un seul véhicule ne peut pas absorber tous les passagers
+   - Reporter uniquement le reliquat non affecté à la fenêtre suivante
 
 ### Étape 3: Calcul d'Itinéraire
 Pour chaque groupe:

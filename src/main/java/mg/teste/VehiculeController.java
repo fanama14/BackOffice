@@ -23,21 +23,20 @@ public class VehiculeController {
             @RequestParam("typeCarburant") String typeCarburant,
             @RequestParam("nombrePlaceMin") String nombrePlaceMinStr,
             @RequestParam("nombrePlaceMax") String nombrePlaceMaxStr) {
-        
+
         ModelView mv = new ModelView("vehicule-list");
         try {
             Integer nombrePlaceMin = parseIntOrNull(nombrePlaceMinStr);
             Integer nombrePlaceMax = parseIntOrNull(nombrePlaceMaxStr);
 
             List<Vehicule> vehicules = vehiculeDAO.findWithFilters(
-                search, typeCarburant, nombrePlaceMin, nombrePlaceMax
-            );
+                    search, typeCarburant, nombrePlaceMin, nombrePlaceMax);
             mv.addData("vehicules", vehicules);
             mv.addData("search", search);
             mv.addData("typeCarburant", typeCarburant);
             mv.addData("nombrePlaceMin", nombrePlaceMinStr);
             mv.addData("nombrePlaceMax", nombrePlaceMaxStr);
-            
+
         } catch (Exception e) {
             mv.addData("error", "Erreur lors du chargement des véhicules : " + e.getMessage());
         }
@@ -77,7 +76,7 @@ public class VehiculeController {
             @RequestParam("reference") String reference,
             @RequestParam("nombrePlace") int nombrePlace,
             @RequestParam("typeCarburant") String typeCarburant) {
-        
+
         ModelView mv = new ModelView("vehicule-form");
         try {
             Vehicule vehicule = new Vehicule();
@@ -86,7 +85,7 @@ public class VehiculeController {
             vehicule.setTypeCarburant(typeCarburant);
 
             Integer id = parseIntOrNull(idStr);
-            
+
             if (id != null && id > 0) {
                 vehicule.setId(id);
                 vehiculeDAO.update(vehicule);

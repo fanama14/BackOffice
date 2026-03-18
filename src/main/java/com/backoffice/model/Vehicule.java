@@ -53,11 +53,16 @@ public class Vehicule {
      */
     public String getTypeCarburantLibelle() {
         switch (typeCarburant) {
-            case "D": return "Diesel";
-            case "ES": return "Essence";
-            case "H": return "Hybride";
-            case "EL": return "Électrique";
-            default: return typeCarburant;
+            case "D":
+                return "Diesel";
+            case "ES":
+                return "Essence";
+            case "H":
+                return "Hybride";
+            case "EL":
+                return "Électrique";
+            default:
+                return typeCarburant;
         }
     }
 }
