@@ -3,6 +3,7 @@ package com.backoffice.service;
 import com.backoffice.dao.AeroportDAO;
 import com.backoffice.dao.DistanceDAO;
 import com.backoffice.dao.HotelDAO;
+import com.backoffice.dao.PlanificationDAO;
 import com.backoffice.dao.VehiculeDAO;
 import com.backoffice.model.*;
 
@@ -34,13 +35,15 @@ public class GroupingService {
     private final HotelDAO hotelDAO;
     private final AeroportDAO aeroportDAO;
     private final DistanceDAO distanceDAO;
+    private final PlanificationDAO planificationDAO;
 
     public GroupingService(VehiculeDAO vehiculeDAO, HotelDAO hotelDAO,
-            AeroportDAO aeroportDAO, DistanceDAO distanceDAO) {
+            AeroportDAO aeroportDAO, DistanceDAO distanceDAO, PlanificationDAO planificationDAO) {
         this.vehiculeDAO = vehiculeDAO;
         this.hotelDAO = hotelDAO;
         this.aeroportDAO = aeroportDAO;
         this.distanceDAO = distanceDAO;
+        this.planificationDAO = planificationDAO;
     }
 
     /**
@@ -56,6 +59,7 @@ public class GroupingService {
         int tempsAttenteMin = parametre.getTempsAttente();
         List<Vehicule> allVehicules = vehiculeDAO.findAll();
         List<VehiculeOccupation> occupations = new ArrayList<>();
+        Map<Integer, Integer> historicalTripCounts = planificationDAO.countTripsByVehicule();
 
         // Trier par date d'arrivée
         List<Reservation> sorted = new ArrayList<>(reservations);
@@ -157,8 +161,10 @@ public class GroupingService {
                                 if (diffA != diffB)
                                     return Integer.compare(diffA, diffB);
                                 // Règle 4 : moins de trajets
-                                int tripsA = countTrips(occupations, a.getId());
-                                int tripsB = countTrips(occupations, b.getId());
+                                int tripsA = historicalTripCounts.getOrDefault(a.getId(), 0)
+                                    + countTrips(occupations, a.getId());
+                                int tripsB = historicalTripCounts.getOrDefault(b.getId(), 0)
+                                    + countTrips(occupations, b.getId());
                                 if (tripsA != tripsB)
                                     return Integer.compare(tripsA, tripsB);
                                 // Règle 5 : carburant D > ES > H > EL

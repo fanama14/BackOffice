@@ -5,7 +5,9 @@ import com.backoffice.model.Planification;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class PlanificationDAO {
 
@@ -79,5 +81,23 @@ public class PlanificationDAO {
             }
         }
         return list;
+    }
+
+    public Map<Integer, Integer> countTripsByVehicule() throws SQLException {
+        Map<Integer, Integer> counts = new HashMap<>();
+        String sql = "SELECT vehicule_id, COUNT(DISTINCT groupe_id) AS trip_count " +
+                     "FROM planification " +
+                     "WHERE vehicule_id IS NOT NULL " +
+                     "GROUP BY vehicule_id";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                counts.put(rs.getInt("vehicule_id"), rs.getInt("trip_count"));
+            }
+        }
+
+        return counts;
     }
 }
