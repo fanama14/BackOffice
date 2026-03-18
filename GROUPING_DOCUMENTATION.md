@@ -119,6 +119,19 @@ Pour chaque groupe:
 3. Vérifier la disponibilité (pas de chevauchement d'occupation)
 4. Assigner le premier véhicule disponible
 
+### Étape 5: Reprise des Non-Assignés Après Retour Véhicule
+Quand il n'y a plus de nouvelles réservations dans la journée, les réservations non assignées ne sont plus marquées immédiatement comme "sans véhicule".
+
+Le service effectue une nouvelle tentative d'assignation en recalculant une ancre temporelle:
+- ancre = max(dernière heure d'arrivée des non-assignés, premier retour de véhicule)
+
+Cela permet de réutiliser un véhicule déjà parti, dès son retour à l'aéroport.
+
+Exemple:
+- Si VH-001 revient à 10:10 et qu'il reste des réservations non assignées, ces réservations sont retentées après 10:10.
+- Si la capacité est suffisante, elles sont affectées à VH-001.
+- Elles ne restent non assignées que si aucune affectation n'est possible après cette tentative finale.
+
 ## Exemple Concret
 
 ### Données d'Entrée
