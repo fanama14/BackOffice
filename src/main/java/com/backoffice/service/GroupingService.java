@@ -75,56 +75,37 @@ public class GroupingService {
             int i = 0;
 
             while (i < dayReservations.size() || !unassigned.isEmpty()) {
-
-                // Plus de nouvelles réservations : les non-assignés restent non-assignés
-                if (i >= dayReservations.size()) {
-                    ReservationGroup grp = new ReservationGroup();
-                    int ordre = 1;
-                    for (Reservation r : unassigned) {
-                        loadReservationInfo(r);
-                        r.setGroupeId(groupeIdCounter);
-                        r.setOrdreLivraison(ordre++);
-                        grp.addReservation(r);
-                    }
-                    allGroups.add(grp);
-                    groupeIdCounter++;
-                    unassigned.clear();
-                    break;
-                }
-
-                // Ancre = première réservation non traitée
-                Reservation anchor = dayReservations.get(i);
-                long anchorTime = anchor.getDateArrivee().getTime();
-                long windowEndMs = anchorTime + (tempsAttenteMin * 60 * 1000L);
-
-                // Collecter les nouvelles réservations dans la fenêtre
+                long anchorTime;
                 List<Reservation> windowNew = new ArrayList<>();
-                windowNew.add(anchor);
-                int j = i + 1;
-                while (j < dayReservations.size()) {
-                    if (dayReservations.get(j).getDateArrivee().getTime() <= windowEndMs) {
-                        windowNew.add(dayReservations.get(j));
-                        j++;
-                    } else {
-                        break;
+                int j = i;
+
+                if (i < dayReservations.size()) {
+                    // Ancre = première réservation non traitée
+                    Reservation anchor = dayReservations.get(i);
+                    anchorTime = anchor.getDateArrivee().getTime();
+                    long windowEndMs = anchorTime + (tempsAttenteMin * 60 * 1000L);
+
+                    // Collecter les nouvelles réservations dans la fenêtre
+                    windowNew.add(anchor);
+                    j = i + 1;
+                    while (j < dayReservations.size()) {
+                        if (dayReservations.get(j).getDateArrivee().getTime() <= windowEndMs) {
+                            windowNew.add(dayReservations.get(j));
+                            j++;
+                        } else {
+                            break;
+                        }
                     }
+                } else {
+                    // Plus de nouvelles réservations : retenter avec une ancre qui tient compte
+                    // des retours de véhicules pour ne pas abandonner trop tôt les non-assignés.
+                    anchorTime = computeRetryAnchorTime(unassigned, occupations);
                 }
 
                 // Tous les clients : non-assignés reportés + nouveaux
                 List<Reservation> windowClients = new ArrayList<>();
                 windowClients.addAll(unassigned);
                 windowClients.addAll(windowNew);
-
-                // Référence de départ potentielle de la fenêtre :
-                // le dernier client de la fenêtre en termes d'heure d'arrivée.
-                // Permet de réutiliser un véhicule qui revient avant ce départ.
-                long windowDepartureReference = anchorTime;
-                for (Reservation r : windowClients) {
-                    long t = r.getDateArrivee().getTime();
-                    if (t > windowDepartureReference) {
-                        windowDepartureReference = t;
-                    }
-                }
 
                 // Trier par nb passagers décroissant
                 windowClients.sort((a, b) -> Integer.compare(b.getNombrePassager(), a.getNombrePassager()));
@@ -162,7 +143,7 @@ public class GroupingService {
                                 continue;
                             if (vehicleStates.containsKey(v.getId()))
                                 continue;
-                            if (isOccupied(occupations, v.getId(), windowDepartureReference))
+                            if (isOccupied(occupations, v.getId(), anchorTime))
                                 continue;
                             candidates.add(v);
                         }
@@ -239,6 +220,20 @@ public class GroupingService {
                 }
 
                 // Reporter les non-assignés à la prochaine fenêtre
+                if (i >= dayReservations.size() && windowNew.isEmpty() && nextUnassigned.size() == windowClients.size()) {
+                    ReservationGroup grp = new ReservationGroup();
+                    int ordre = 1;
+                    for (Reservation r : nextUnassigned) {
+                        r.setGroupeId(groupeIdCounter);
+                        r.setOrdreLivraison(ordre++);
+                        grp.addReservation(r);
+                    }
+                    allGroups.add(grp);
+                    groupeIdCounter++;
+                    unassigned = new ArrayList<>();
+                    break;
+                }
+
                 unassigned = nextUnassigned;
                 i = j;
             }
@@ -331,6 +326,25 @@ public class GroupingService {
                 count++;
         }
         return count;
+    }
+
+    private long computeRetryAnchorTime(List<Reservation> unassigned, List<VehiculeOccupation> occupations) {
+        long latestUnassignedArrival = 0;
+        for (Reservation r : unassigned) {
+            if (r.getDateArrivee() != null) {
+                latestUnassignedArrival = Math.max(latestUnassignedArrival, r.getDateArrivee().getTime());
+            }
+        }
+
+        long earliestVehicleReturn = Long.MAX_VALUE;
+        for (VehiculeOccupation occ : occupations) {
+            earliestVehicleReturn = Math.min(earliestVehicleReturn, occ.fin.getTime());
+        }
+
+        if (earliestVehicleReturn == Long.MAX_VALUE) {
+            return latestUnassignedArrival;
+        }
+        return Math.max(latestUnassignedArrival, earliestVehicleReturn);
     }
 
     private int fuelPriority(String type) {
