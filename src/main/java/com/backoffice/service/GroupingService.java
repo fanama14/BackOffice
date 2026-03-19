@@ -101,9 +101,18 @@ public class GroupingService {
                         }
                     }
                 } else {
-                    // Plus de nouvelles réservations : retenter avec une ancre qui tient compte
-                    // des retours de véhicules pour ne pas abandonner trop tôt les non-assignés.
-                    anchorTime = computeRetryAnchorTime(unassigned, occupations);
+                    // Plus de nouvelles réservations : conserver l'ancre sur les non-assignés.
+                    // On ne décale pas l'ancre au retour d'un véhicule si aucune nouvelle
+                    // réservation n'arrive, sinon on "replanifie" artificiellement des clients.
+                    anchorTime = Long.MAX_VALUE;
+                    for (Reservation r : unassigned) {
+                        if (r.getDateArrivee() != null) {
+                            anchorTime = Math.min(anchorTime, r.getDateArrivee().getTime());
+                        }
+                    }
+                    if (anchorTime == Long.MAX_VALUE) {
+                        anchorTime = 0;
+                    }
                 }
 
                 // Tous les clients : non-assignés reportés + nouveaux
@@ -332,25 +341,6 @@ public class GroupingService {
                 count++;
         }
         return count;
-    }
-
-    private long computeRetryAnchorTime(List<Reservation> unassigned, List<VehiculeOccupation> occupations) {
-        long latestUnassignedArrival = 0;
-        for (Reservation r : unassigned) {
-            if (r.getDateArrivee() != null) {
-                latestUnassignedArrival = Math.max(latestUnassignedArrival, r.getDateArrivee().getTime());
-            }
-        }
-
-        long earliestVehicleReturn = Long.MAX_VALUE;
-        for (VehiculeOccupation occ : occupations) {
-            earliestVehicleReturn = Math.min(earliestVehicleReturn, occ.fin.getTime());
-        }
-
-        if (earliestVehicleReturn == Long.MAX_VALUE) {
-            return latestUnassignedArrival;
-        }
-        return Math.max(latestUnassignedArrival, earliestVehicleReturn);
     }
 
     private int fuelPriority(String type) {
