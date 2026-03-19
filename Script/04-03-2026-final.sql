@@ -9,9 +9,9 @@
 -- Table LIEUX
 -- ============================
 \c postgres;
-DROP DATABASE IF EXISTS sprint_5;
-CREATE DATABASE sprint_5;
-\c sprint_5;
+DROP DATABASE IF EXISTS sprint_7;
+CREATE DATABASE sprint_7;
+\c sprint_7;
 CREATE TABLE lieux (
     id SERIAL PRIMARY KEY,
     lieu VARCHAR(150) NOT NULL
@@ -129,10 +129,8 @@ INSERT INTO aeroport (code, libelle, lieux_id) VALUES
 
 -- Vehicules
 INSERT INTO vehicule (reference, nombre_place, type_carburant) VALUES
-('VH-001', 12, 'D'),
-('VH-002', 5, 'ES'),
-('VH-003', 5, 'D'),
-('VH-004', 12, 'ES');
+('VH-001', 8, 'D'),
+('VH-002', 3, 'D');
 
 -- Parametre
 INSERT INTO parametre (temps_attente, vitesse_moyenne) VALUES (30, 50);
@@ -147,32 +145,9 @@ INSERT INTO distance (lieux_from, lieux_to, valeur) VALUES
 
 -- reservations
 INSERT INTO reservation (client_id, nombre_passager, date_arrivee, hotel_id, aeroport_id) VALUES
--- Fenetre 1: 09:00 -> 09:30 (temps_attente = 30)
-('clientA', 8, '2026-03-12 09:00:00', 1, 1),
-('clientB', 4, '2026-03-12 09:05:00', 1, 1),
-('clientC', 3, '2026-03-12 09:10:00', 1, 1),
-('clientD', 3, '2026-03-12 09:12:00', 1, 1),
-('clientE', 6, '2026-03-12 09:25:00', 1, 1),
-('clientF', 7, '2026-03-12 09:27:00', 1, 1),
-
--- Fenetre 2: ancree par la premiere reservation strictement > 09:30
-('clientG', 5, '2026-03-12 12:00:00', 1, 1),
-('clientH', 2, '2026-03-12 12:10:00', 1, 1);
-
--- Resultat attendu (indicatif pour verifier l'algo):
--- Fenetre 1 (ordre de traitement decroissant: 8,7,6,4,3,3)
--- 1) clientA(8) -> VH-001(12,D)
--- 2) clientE(6) -> VH-004(12,ES) (plus proche que 5 places)
--- 3) clientB(4) -> VH-001 (regle remplir vehicule deja ouvert)
--- 4) clientC(3) -> VH-003(5,D) (capacite la plus proche, tie carburant vs VH-002)
--- 5) clientD(3) -> VH-002(5,ES)
--- 6) clientF(7) -> non assigne en fenetre 1 (attend fenetre suivante)
---
--- Fenetre 2 (avec clientF en attente + nouveaux clients)
--- Ordre de traitement: clientF(7), clientG(5), clientH(2)
--- 1) clientF(7) -> VH-001 si revenu disponible au depart reel du groupe
--- 2) clientG(5) -> VH-001 (remplissage du vehicule deja ouvert)
--- 3) clientH(2) -> VH-003 (5 places, diesel prioritaire en cas d'egalite)
+('R1', 6, '2026-03-19 09:00:00', 1, 1),
+('R2', 4, '2026-03-19 09:00:00', 1, 1),
+('R3', 3, '2026-03-19 09:00:00', 1, 1);
 
 -- ============================
 -- Table PLANIFICATION

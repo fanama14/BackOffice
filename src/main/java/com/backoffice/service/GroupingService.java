@@ -101,9 +101,19 @@ public class GroupingService {
                         }
                     }
                 } else {
-                    // Plus de nouvelles réservations : retenter avec une ancre qui tient compte
-                    // des retours de véhicules pour ne pas abandonner trop tôt les non-assignés.
-                    anchorTime = computeRetryAnchorTime(unassigned, occupations);
+                    // Plus aucune nouvelle réservation : on n'ouvre pas de nouveau trajet
+                    // uniquement pour des reliquats finaux, ils restent non assignés.
+                    ReservationGroup grp = new ReservationGroup();
+                    int ordre = 1;
+                    for (Reservation r : unassigned) {
+                        r.setGroupeId(groupeIdCounter);
+                        r.setOrdreLivraison(ordre++);
+                        grp.addReservation(r);
+                    }
+                    allGroups.add(grp);
+                    groupeIdCounter++;
+                    unassigned = new ArrayList<>();
+                    break;
                 }
 
                 // Tous les clients : non-assignés reportés + nouveaux
