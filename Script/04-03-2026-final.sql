@@ -147,12 +147,32 @@ INSERT INTO distance (lieux_from, lieux_to, valeur) VALUES
 
 -- reservations
 INSERT INTO reservation (client_id, nombre_passager, date_arrivee, hotel_id, aeroport_id) VALUES
-('client1', 7,  '2026-03-12 09:00:00', 1, 1),
-('client2', 11, '2026-03-12 09:00:00', 1, 1),
-('client3', 3,  '2026-03-12 09:00:00', 1, 1),
-('Client4', 1,  '2026-03-12 09:00:00', 1, 1),
-('client5', 2,  '2026-03-12 09:00:00', 1, 1),
-('client6', 20, '2026-03-12 09:00:00', 1, 1);
+-- Fenetre 1: 09:00 -> 09:30 (temps_attente = 30)
+('clientA', 8, '2026-03-12 09:00:00', 1, 1),
+('clientB', 4, '2026-03-12 09:05:00', 1, 1),
+('clientC', 3, '2026-03-12 09:10:00', 1, 1),
+('clientD', 3, '2026-03-12 09:12:00', 1, 1),
+('clientE', 6, '2026-03-12 09:25:00', 1, 1),
+('clientF', 7, '2026-03-12 09:27:00', 1, 1),
+
+-- Fenetre 2: ancree par la premiere reservation strictement > 09:30
+('clientG', 5, '2026-03-12 12:00:00', 1, 1),
+('clientH', 2, '2026-03-12 12:10:00', 1, 1);
+
+-- Resultat attendu (indicatif pour verifier l'algo):
+-- Fenetre 1 (ordre de traitement decroissant: 8,7,6,4,3,3)
+-- 1) clientA(8) -> VH-001(12,D)
+-- 2) clientE(6) -> VH-004(12,ES) (plus proche que 5 places)
+-- 3) clientB(4) -> VH-001 (regle remplir vehicule deja ouvert)
+-- 4) clientC(3) -> VH-003(5,D) (capacite la plus proche, tie carburant vs VH-002)
+-- 5) clientD(3) -> VH-002(5,ES)
+-- 6) clientF(7) -> non assigne en fenetre 1 (attend fenetre suivante)
+--
+-- Fenetre 2 (avec clientF en attente + nouveaux clients)
+-- Ordre de traitement: clientF(7), clientG(5), clientH(2)
+-- 1) clientF(7) -> VH-001 si revenu disponible au depart reel du groupe
+-- 2) clientG(5) -> VH-001 (remplissage du vehicule deja ouvert)
+-- 3) clientH(2) -> VH-003 (5 places, diesel prioritaire en cas d'egalite)
 
 -- ============================
 -- Table PLANIFICATION
