@@ -36,7 +36,8 @@ public class PlanificationController {
     @GET("planification")
     public ModelView showPlanification(
             @RequestParam(value = "dateDebut", required = false) String dateDebut,
-            @RequestParam(value = "dateFin", required = false) String dateFin) {
+            @RequestParam(value = "dateFin", required = false) String dateFin,
+            @RequestParam(value = "action", required = false) String action) {
 
         ModelView mv = new ModelView("planification");
 
@@ -61,45 +62,57 @@ public class PlanificationController {
                 tsFin = Timestamp.valueOf(tsFin.toString().substring(0, 10) + " 23:59:59");
             }
 
-            // Récupérer les réservations de la période
-            List<Reservation> reservations = reservationDAO.findByPeriode(tsDebut, tsFin);
+            String mode = (action == null || action.trim().isEmpty()) ? "filtrer" : action.trim().toLowerCase();
 
-            // Planifier via le service (nouvelles règles d'assignation)
-            GroupingService service = new GroupingService(vehiculeDAO, hotelDAO, aeroportDAO, distanceDAO,
-                    planificationDAO);
-            List<ReservationGroup> groups = service.planifier(reservations, parametre);
+            List<Reservation> result;
 
-            // Aplatir les groupes en liste de réservations pour la JSP
-            List<Reservation> result = new ArrayList<>();
-            List<Planification> planifications = new ArrayList<>();
+            if ("planifier".equals(mode) || "filtrer".equals(mode)) {
+                // Filtrer déclenche aussi le recalcul + sauvegarde pour garantir
+                // que les planifications existent toujours sur la période demandée.
+                List<Reservation> reservations = reservationDAO.findByPeriode(tsDebut, tsFin);
 
-            for (ReservationGroup group : groups) {
-                for (Reservation r : group.getReservations()) {
-                    result.add(r);
+                GroupingService service = new GroupingService(vehiculeDAO, hotelDAO, aeroportDAO, distanceDAO,
+                        planificationDAO);
+                List<ReservationGroup> groups = service.planifier(reservations, parametre);
 
-                    // Préparer l'objet Planification pour la sauvegarde
-                    Planification p = new Planification();
-                    p.setReservationId(r.getId());
-                    p.setGroupeId(r.getGroupeId());
-                    p.setOrdreLivraison(r.getOrdreLivraison());
-                    p.setHeureDepart(r.getHeureDepartAeroport());
-                    p.setHeureRetour(r.getHeureRetourAeroport());
-                    if (group.getVehicule() != null) {
-                        p.setVehiculeId(group.getVehicule().getId());
+                result = new ArrayList<>();
+                List<Planification> planifications = new ArrayList<>();
+
+                for (ReservationGroup group : groups) {
+                    for (Reservation r : group.getReservations()) {
+                        result.add(r);
+
+                        Planification p = new Planification();
+                        p.setReservationId(r.getId());
+                        p.setNbPassagersAffectes(r.getNombrePassager());
+                        p.setGroupeId(r.getGroupeId());
+                        p.setOrdreLivraison(r.getOrdreLivraison());
+                        p.setHeureDepart(r.getHeureDepartAeroport());
+                        p.setHeureRetour(r.getHeureRetourAeroport());
+                        if (group.getVehicule() != null) {
+                            p.setVehiculeId(group.getVehicule().getId());
+                        }
+                        planifications.add(p);
                     }
-                    planifications.add(p);
                 }
-            }
 
-            // Sauvegarder la planification en base
-            planificationDAO.deleteByPeriode(tsDebut, tsFin);
-            if (!planifications.isEmpty()) {
-                planificationDAO.insertBatch(planifications);
+                planificationDAO.deleteByPeriode(tsDebut, tsFin);
+                if (!planifications.isEmpty()) {
+                    planificationDAO.insertBatch(planifications);
+                }
+
+                if ("planifier".equals(mode)) {
+                    mv.addData("success", "Planification recalculée et enregistrée.");
+                }
+            } else {
+                // Mode inconnu: fallback sur les planifications déjà enregistrées.
+                result = planificationDAO.findReservationsByPeriode(tsDebut, tsFin);
             }
 
             mv.addData("reservations", result);
             mv.addData("dateDebut", tsDebut.toString().substring(0, 10));
             mv.addData("dateFin", tsFin.toString().substring(0, 10));
+            mv.addData("action", mode);
 
         } catch (Exception e) {
             mv.addData("error", "Erreur lors du chargement : " + e.getMessage());

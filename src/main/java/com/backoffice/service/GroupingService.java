@@ -14,7 +14,7 @@ import java.util.*;
 /**
  * Service de planification des véhicules.
  *
- * ASSIGNATION PAR ORDRE DÉCROISSANT DU NB PASSAGERS.
+ * ASSIGNATION PAR PROXIMITÉ AUX PLACES RESTANTES DU VÉHICULE.
  *
  * Priorité des règles :
  * 1. NB PLACES >= NB PASSAGERS (contrainte dure)
@@ -64,6 +64,11 @@ public class GroupingService {
         // Trier par date d'arrivée
         List<Reservation> sorted = new ArrayList<>(reservations);
         sorted.sort(Comparator.comparing(Reservation::getDateArrivee));
+        for (Reservation r : sorted) {
+            if (r.getNombrePassagerOrigine() <= 0) {
+                r.setNombrePassagerOrigine(r.getNombrePassager());
+            }
+        }
 
         // Grouper par jour
         Map<String, List<Reservation>> byDay = new LinkedHashMap<>();
@@ -80,20 +85,55 @@ public class GroupingService {
 
             while (i < dayReservations.size() || !unassigned.isEmpty()) {
                 long anchorTime;
+                long currentWindowEndMs;
                 List<Reservation> windowNew = new ArrayList<>();
                 int j = i;
 
-                if (i < dayReservations.size()) {
+                if (!unassigned.isEmpty()) {
+                    // Tant qu'il existe des reliquats, on ancre d'abord la fenêtre
+                    // sur le prochain instant utile. Les nouvelles réservations ne sont
+                    // intégrées que si elles tombent dans cette même fenêtre de reprise.
+                    anchorTime = computeRetryAnchorTime(unassigned, occupations);
+                    currentWindowEndMs = anchorTime + (tempsAttenteMin * 60 * 1000L);
+                    j = i;
+                    while (j < dayReservations.size()) {
+                        if (dayReservations.get(j).getDateArrivee().getTime() <= currentWindowEndMs) {
+                            windowNew.add(dayReservations.get(j));
+                            j++;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    // Évite la boucle infinie: si aucune nouvelle réservation n'entre
+                    // dans la fenêtre de reprise, on force l'ancrage sur la prochaine
+                    // réservation pour faire progresser l'index i.
+                    if (windowNew.isEmpty() && i < dayReservations.size()) {
+                        Reservation nextAnchor = dayReservations.get(i);
+                        anchorTime = nextAnchor.getDateArrivee().getTime();
+                        currentWindowEndMs = anchorTime + (tempsAttenteMin * 60 * 1000L);
+                        windowNew.add(nextAnchor);
+                        j = i + 1;
+                        while (j < dayReservations.size()) {
+                            if (dayReservations.get(j).getDateArrivee().getTime() <= currentWindowEndMs) {
+                                windowNew.add(dayReservations.get(j));
+                                j++;
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                } else if (i < dayReservations.size()) {
                     // Ancre = première réservation non traitée
                     Reservation anchor = dayReservations.get(i);
                     anchorTime = anchor.getDateArrivee().getTime();
-                    long windowEndMs = anchorTime + (tempsAttenteMin * 60 * 1000L);
+                    currentWindowEndMs = anchorTime + (tempsAttenteMin * 60 * 1000L);
 
                     // Collecter les nouvelles réservations dans la fenêtre
                     windowNew.add(anchor);
                     j = i + 1;
                     while (j < dayReservations.size()) {
-                        if (dayReservations.get(j).getDateArrivee().getTime() <= windowEndMs) {
+                        if (dayReservations.get(j).getDateArrivee().getTime() <= currentWindowEndMs) {
                             windowNew.add(dayReservations.get(j));
                             j++;
                         } else {
@@ -101,18 +141,6 @@ public class GroupingService {
                         }
                     }
                 } else {
-                    // Plus aucune nouvelle réservation : on n'ouvre pas de nouveau trajet
-                    // uniquement pour des reliquats finaux, ils restent non assignés.
-                    ReservationGroup grp = new ReservationGroup();
-                    int ordre = 1;
-                    for (Reservation r : unassigned) {
-                        r.setGroupeId(groupeIdCounter);
-                        r.setOrdreLivraison(ordre++);
-                        grp.addReservation(r);
-                    }
-                    allGroups.add(grp);
-                    groupeIdCounter++;
-                    unassigned = new ArrayList<>();
                     break;
                 }
 
@@ -121,10 +149,11 @@ public class GroupingService {
                 windowClients.addAll(unassigned);
                 windowClients.addAll(windowNew);
 
-                // Priorité absolue aux reliquats issus d'un split, puis nb passagers décroissant
+                // Ordre de base: nb passagers décroissant puis arrivée.
                 windowClients.sort((a, b) -> {
-                    if (a.isPrioriteAssignation() != b.isPrioriteAssignation()) {
-                        return a.isPrioriteAssignation() ? -1 : 1;
+                    int byOrigin = Integer.compare(priorityPassengerCount(b), priorityPassengerCount(a));
+                    if (byOrigin != 0) {
+                        return byOrigin;
                     }
                     int byPassengers = Integer.compare(b.getNombrePassager(), a.getNombrePassager());
                     if (byPassengers != 0) {
@@ -142,106 +171,114 @@ public class GroupingService {
                 Map<Integer, VehicleWindowState> vehicleStates = new LinkedHashMap<>();
                 List<Reservation> nextUnassigned = new ArrayList<>();
                 long latestAssignedArrival = anchorTime;
+                long dispatchTimeMs = anchorTime;
 
-                // === ASSIGNATION CLIENT PAR CLIENT (split possible) ===
-                for (Reservation client : windowClients) {
-                    int remainingPassengers = client.getNombrePassager();
-                    boolean assignedAny = false;
+                // === ASSIGNATION PAR MEILLEURE PROXIMITÉ (split possible) ===
+                List<Reservation> pendingClients = new ArrayList<>(windowClients);
 
-                    // RÈGLE 2 : REMPLIR d'abord les véhicules déjà ouverts dans la fenêtre
-                    for (VehicleWindowState state : vehicleStates.values()) {
-                        if (remainingPassengers <= 0)
-                            break;
-                        if (state.remainingSeats <= 0)
+                while (!pendingClients.isEmpty()) {
+                    // Règle stricte: traiter d'abord la réservation avec le plus grand
+                    // nombre de passagers (puis arrivée la plus tôt).
+                    Reservation seedClient = selectHighestPriorityClient(pendingClients);
+                    if (seedClient == null) {
+                        break;
+                    }
+
+                    // Essayer d'abord de placer entièrement ce client dans un véhicule
+                    // déjà ouvert dans la fenêtre.
+                    VehicleWindowState openedFit = findBestOpenedVehicleForClient(
+                            vehicleStates,
+                            seedClient.getNombrePassager());
+                    if (openedFit != null) {
+                        pendingClients.remove(seedClient);
+                        openedFit.remainingSeats -= seedClient.getNombrePassager();
+                        openedFit.clients.add(splitReservation(seedClient, seedClient.getNombrePassager()));
+                        openedFit.latestAssignedArrivalMs = Math.max(
+                                openedFit.latestAssignedArrivalMs,
+                                seedClient.getDateArrivee().getTime());
+                        long openedLatestArrival = fillRemainingSeatsInOpenedVehicle(openedFit, pendingClients);
+                        openedFit.latestAssignedArrivalMs = Math.max(openedFit.latestAssignedArrivalMs, openedLatestArrival);
+                        latestAssignedArrival = Math.max(
+                                latestAssignedArrival,
+                                openedFit.latestAssignedArrivalMs);
+                        continue;
+                    }
+
+                    // RÈGLES 3-5 : trouver un nouveau véhicule
+                    List<Vehicule> candidates = new ArrayList<>();
+                    for (Vehicule v : allVehicules) {
+                        if (v.getNombrePlace() <= 0)
                             continue;
-
-                        int allocated = Math.min(remainingPassengers, state.remainingSeats);
-                        state.remainingSeats -= allocated;
-                        state.clients.add(splitReservation(client, allocated));
-                        remainingPassengers -= allocated;
-                        assignedAny = true;
+                        if (vehicleStates.containsKey(v.getId()))
+                            continue;
+                        if (!isAvailableAtInitialHour(v, dispatchTimeMs))
+                            continue;
+                        if (isOccupied(occupations, v.getId(), dispatchTimeMs))
+                            continue;
+                        candidates.add(v);
                     }
-
-                    while (remainingPassengers > 0) {
-                        // RÈGLES 3-5 : trouver un nouveau véhicule
-                        List<Vehicule> candidates = new ArrayList<>();
-                        for (Vehicule v : allVehicules) {
-                            if (v.getNombrePlace() <= 0)
-                                continue;
-                            if (vehicleStates.containsKey(v.getId()))
-                                continue;
-                            if (isOccupied(occupations, v.getId(), anchorTime))
-                                continue;
-                            candidates.add(v);
-                        }
-
-                        if (candidates.isEmpty()) {
-                            break;
-                        }
-
-                        final int np = remainingPassengers;
-                        candidates.sort((a, b) -> {
-                            // Règle 3 : capacité la plus adaptée au reste à assigner
-                            boolean fitA = a.getNombrePlace() >= np;
-                            boolean fitB = b.getNombrePlace() >= np;
-                            if (fitA != fitB)
-                                return fitA ? -1 : 1;
-                            if (fitA) {
-                                int diffA = a.getNombrePlace() - np;
-                                int diffB = b.getNombrePlace() - np;
-                                if (diffA != diffB)
-                                    return Integer.compare(diffA, diffB);
-                            } else {
-                                int capCmp = Integer.compare(b.getNombrePlace(), a.getNombrePlace());
-                                if (capCmp != 0)
-                                    return capCmp;
-                            }
-
-                            // Règle 4 : moins de trajets
-                            int tripsA = historicalTripCounts.getOrDefault(a.getId(), 0)
-                                    + countTrips(occupations, a.getId());
-                            int tripsB = historicalTripCounts.getOrDefault(b.getId(), 0)
-                                    + countTrips(occupations, b.getId());
-                            if (tripsA != tripsB)
-                                return Integer.compare(tripsA, tripsB);
-
-                            // Règle 5 : carburant D > ES > H > EL
-                            return Integer.compare(fuelPriority(a.getTypeCarburant()),
-                                    fuelPriority(b.getTypeCarburant()));
-                        });
-
-                        Vehicule chosen = candidates.get(0);
-                        int allocated = Math.min(remainingPassengers, chosen.getNombrePlace());
-
-                        VehicleWindowState state = new VehicleWindowState();
-                        state.vehicule = chosen;
-                        state.remainingSeats = chosen.getNombrePlace() - allocated;
-                        state.clients = new ArrayList<>();
-                        state.clients.add(splitReservation(client, allocated));
-                        vehicleStates.put(chosen.getId(), state);
-
-                        remainingPassengers -= allocated;
-                        assignedAny = true;
-                    }
-
-                    if (assignedAny) {
-                        if (client.getDateArrivee().getTime() > latestAssignedArrival) {
-                            latestAssignedArrival = client.getDateArrivee().getTime();
+                    Vehicule chosen = null;
+                    for (Vehicule candidateVehicule : candidates) {
+                        if (chosen == null || compareVehicleClientPair(
+                                candidateVehicule,
+                                seedClient,
+                                chosen,
+                                seedClient,
+                                occupations,
+                                historicalTripCounts) < 0) {
+                            chosen = candidateVehicule;
                         }
                     }
 
-                    if (remainingPassengers > 0) {
-                        Reservation remainder = splitReservation(client, remainingPassengers);
+                    if (chosen == null) {
+                        Long nextAvailability = findNextVehicleAvailabilityTime(
+                                allVehicules,
+                                vehicleStates,
+                                occupations,
+                                dispatchTimeMs,
+                                seedClient.getNombrePassager());
+                        if (nextAvailability != null
+                                && nextAvailability > dispatchTimeMs
+                                && nextAvailability <= currentWindowEndMs) {
+                            dispatchTimeMs = nextAvailability;
+                            continue;
+                        }
+                        break;
+                    }
+
+                    pendingClients.remove(seedClient);
+                    int allocated = Math.min(seedClient.getNombrePassager(), chosen.getNombrePlace());
+
+                    VehicleWindowState state = new VehicleWindowState();
+                    state.vehicule = chosen;
+                    state.remainingSeats = chosen.getNombrePlace() - allocated;
+                    state.dispatchTimeMs = dispatchTimeMs;
+                    state.latestAssignedArrivalMs = seedClient.getDateArrivee().getTime();
+                    state.clients = new ArrayList<>();
+                    state.clients.add(splitReservation(seedClient, allocated));
+                    vehicleStates.put(chosen.getId(), state);
+
+                    latestAssignedArrival = Math.max(latestAssignedArrival, seedClient.getDateArrivee().getTime());
+
+                    int remainderPassengers = seedClient.getNombrePassager() - allocated;
+                    if (remainderPassengers > 0) {
+                        Reservation remainder = splitReservation(seedClient, remainderPassengers);
                         remainder.setPrioriteAssignation(true);
-                        nextUnassigned.add(remainder);
+                        pendingClients.add(remainder);
                     }
+
+                    long stateLatestArrival = fillRemainingSeatsInOpenedVehicle(state, pendingClients);
+                    state.latestAssignedArrivalMs = Math.max(state.latestAssignedArrivalMs, stateLatestArrival);
+                    latestAssignedArrival = Math.max(latestAssignedArrival, state.latestAssignedArrivalMs);
+
                 }
 
-                // Heure de départ = heure d'arrivée du dernier client assigné
-                Timestamp departureTime = new Timestamp(latestAssignedArrival);
+                nextUnassigned.addAll(pendingClients);
 
                 // Créer les groupes pour chaque véhicule assigné
                 for (VehicleWindowState state : vehicleStates.values()) {
+                    Timestamp departureTime = new Timestamp(
+                            Math.max(state.latestAssignedArrivalMs, state.dispatchTimeMs));
                     ReservationGroup group = new ReservationGroup();
                     group.setVehicule(state.vehicule);
                     group.setHeureDepartAeroport(departureTime);
@@ -285,6 +322,9 @@ public class GroupingService {
                     break;
                 }
 
+                for (Reservation carry : nextUnassigned) {
+                    carry.setPrioriteAssignation(true);
+                }
                 unassigned = nextUnassigned;
                 i = j;
             }
@@ -363,11 +403,105 @@ public class GroupingService {
 
     private boolean isOccupied(List<VehiculeOccupation> occupations, int vehiculeId, long time) {
         for (VehiculeOccupation occ : occupations) {
-            if (occ.vehiculeId == vehiculeId && time < occ.fin.getTime()) {
+            if (occ.vehiculeId == vehiculeId
+                    && occ.debut.getTime() <= time
+                    && time < occ.fin.getTime()) {
                 return true;
             }
         }
         return false;
+    }
+
+    private Long findNextVehicleAvailabilityTime(
+            List<Vehicule> allVehicules,
+            Map<Integer, VehicleWindowState> vehicleStates,
+            List<VehiculeOccupation> occupations,
+            long fromTime,
+            int requiredPassengers) {
+
+        Long bestFitTime = null;
+        Long bestAnyTime = null;
+
+        for (Vehicule v : allVehicules) {
+            if (v.getNombrePlace() <= 0)
+                continue;
+            if (vehicleStates.containsKey(v.getId()))
+                continue;
+
+            long next = Math.max(fromTime, computeInitialAvailabilityTime(v, fromTime));
+            next = getBusyUntil(occupations, v.getId(), next);
+
+            if (v.getNombrePlace() >= requiredPassengers) {
+                if (bestFitTime == null || next < bestFitTime) {
+                    bestFitTime = next;
+                }
+            } else {
+                if (bestAnyTime == null || next < bestAnyTime) {
+                    bestAnyTime = next;
+                }
+            }
+        }
+
+        return bestFitTime != null ? bestFitTime : bestAnyTime;
+    }
+
+    private long computeInitialAvailabilityTime(Vehicule vehicule, long referenceTimeMs) {
+        if (vehicule == null || vehicule.getHeureDisponibilite() == null) {
+            return referenceTimeMs;
+        }
+
+        Calendar reference = Calendar.getInstance();
+        reference.setTimeInMillis(referenceTimeMs);
+
+        Calendar dispo = Calendar.getInstance();
+        dispo.setTimeInMillis(vehicule.getHeureDisponibilite().getTime());
+
+        reference.set(Calendar.HOUR_OF_DAY, dispo.get(Calendar.HOUR_OF_DAY));
+        reference.set(Calendar.MINUTE, dispo.get(Calendar.MINUTE));
+        reference.set(Calendar.SECOND, dispo.get(Calendar.SECOND));
+        reference.set(Calendar.MILLISECOND, 0);
+
+        return reference.getTimeInMillis();
+    }
+
+    private long getBusyUntil(List<VehiculeOccupation> occupations, int vehiculeId, long time) {
+        long busyUntil = time;
+        for (VehiculeOccupation occ : occupations) {
+            if (occ.vehiculeId == vehiculeId
+                    && occ.debut.getTime() <= time
+                    && time < occ.fin.getTime()) {
+                busyUntil = Math.max(busyUntil, occ.fin.getTime());
+            }
+        }
+        return busyUntil;
+    }
+
+    private boolean hasVehicleWithCapacity(List<Vehicule> vehicules, int requiredPassengers) {
+        for (Vehicule v : vehicules) {
+            if (v.getNombrePlace() >= requiredPassengers) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isAvailableAtInitialHour(Vehicule vehicule, long reservationTimeMs) {
+        if (vehicule == null || vehicule.getHeureDisponibilite() == null) {
+            return true;
+        }
+
+        Calendar reservationCalendar = Calendar.getInstance();
+        reservationCalendar.setTimeInMillis(reservationTimeMs);
+
+        Calendar heureDispo = Calendar.getInstance();
+        heureDispo.setTimeInMillis(vehicule.getHeureDisponibilite().getTime());
+
+        reservationCalendar.set(Calendar.HOUR_OF_DAY, heureDispo.get(Calendar.HOUR_OF_DAY));
+        reservationCalendar.set(Calendar.MINUTE, heureDispo.get(Calendar.MINUTE));
+        reservationCalendar.set(Calendar.SECOND, heureDispo.get(Calendar.SECOND));
+        reservationCalendar.set(Calendar.MILLISECOND, 0);
+
+        return reservationTimeMs >= reservationCalendar.getTimeInMillis();
     }
 
     private int countTrips(List<VehiculeOccupation> occupations, int vehiculeId) {
@@ -377,6 +511,181 @@ public class GroupingService {
                 count++;
         }
         return count;
+    }
+
+    private Reservation selectHighestPriorityClient(List<Reservation> clients) {
+        Reservation best = null;
+        for (Reservation r : clients) {
+            if (best == null) {
+                best = r;
+                continue;
+            }
+
+            int byOrigin = Integer.compare(priorityPassengerCount(r), priorityPassengerCount(best));
+            if (byOrigin > 0) {
+                best = r;
+                continue;
+            }
+            if (byOrigin < 0) {
+                continue;
+            }
+
+            int byPassengers = Integer.compare(r.getNombrePassager(), best.getNombrePassager());
+            if (byPassengers > 0) {
+                best = r;
+                continue;
+            }
+
+            if (byPassengers == 0
+                    && r.getDateArrivee().before(best.getDateArrivee())) {
+                best = r;
+            }
+        }
+        return best;
+    }
+
+    private VehicleWindowState findBestOpenedVehicleForClient(
+            Map<Integer, VehicleWindowState> vehicleStates,
+            int requiredPassengers) {
+
+        VehicleWindowState best = null;
+        for (VehicleWindowState state : vehicleStates.values()) {
+            if (state.remainingSeats < requiredPassengers) {
+                continue;
+            }
+            if (best == null || state.remainingSeats < best.remainingSeats) {
+                best = state;
+            }
+        }
+        return best;
+    }
+
+    private Reservation selectBestClientForRemainingSeats(
+            List<Reservation> candidates,
+            int remainingSeats,
+            boolean allowOversize) {
+        Reservation best = null;
+        for (Reservation candidate : candidates) {
+            if (!allowOversize && candidate.getNombrePassager() > remainingSeats) {
+                continue;
+            }
+            if (best == null || compareClientsForRemainingSeats(candidate, best, remainingSeats) < 0) {
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
+    private int compareClientsForRemainingSeats(Reservation a, Reservation b, int remainingSeats) {
+        boolean aFits = a.getNombrePassager() <= remainingSeats;
+        boolean bFits = b.getNombrePassager() <= remainingSeats;
+        if (aFits != bFits) {
+            return aFits ? -1 : 1;
+        }
+
+        int diffA = Math.abs(remainingSeats - a.getNombrePassager());
+        int diffB = Math.abs(remainingSeats - b.getNombrePassager());
+        if (diffA != diffB) {
+            return Integer.compare(diffA, diffB);
+        }
+
+        int byPassengers = Integer.compare(b.getNombrePassager(), a.getNombrePassager());
+        if (byPassengers != 0) {
+            return byPassengers;
+        }
+
+        return a.getDateArrivee().compareTo(b.getDateArrivee());
+    }
+
+    private long fillRemainingSeatsInOpenedVehicle(VehicleWindowState state, List<Reservation> pendingClients) {
+        long latestArrival = state.latestAssignedArrivalMs;
+
+        while (state.remainingSeats > 0 && !pendingClients.isEmpty()) {
+            Reservation candidate = selectBestClientForRemainingSeats(pendingClients, state.remainingSeats, true);
+            if (candidate == null) {
+                break;
+            }
+
+            pendingClients.remove(candidate);
+            int allocated = Math.min(candidate.getNombrePassager(), state.remainingSeats);
+            state.remainingSeats -= allocated;
+            state.clients.add(splitReservation(candidate, allocated));
+            latestArrival = Math.max(latestArrival, candidate.getDateArrivee().getTime());
+
+            int remainderPassengers = candidate.getNombrePassager() - allocated;
+            if (remainderPassengers > 0) {
+                Reservation remainder = splitReservation(candidate, remainderPassengers);
+                remainder.setPrioriteAssignation(true);
+                pendingClients.add(remainder);
+            }
+        }
+
+        return latestArrival;
+    }
+
+    private int compareClientsForVehicleStart(Reservation a, Reservation b) {
+        int byPassengers = Integer.compare(b.getNombrePassager(), a.getNombrePassager());
+        if (byPassengers != 0) {
+            return byPassengers;
+        }
+
+        return a.getDateArrivee().compareTo(b.getDateArrivee());
+    }
+
+    private int compareVehicleClientPair(
+            Vehicule vehiculeA,
+            Reservation clientA,
+            Vehicule vehiculeB,
+            Reservation clientB,
+            List<VehiculeOccupation> occupations,
+            Map<Integer, Integer> historicalTripCounts) {
+
+        // Contrainte dure: privilégier un véhicule qui peut absorber
+        // toute la réservation (pas de split) si possible.
+        boolean aFits = vehiculeA.getNombrePlace() >= clientA.getNombrePassager();
+        boolean bFits = vehiculeB.getNombrePlace() >= clientB.getNombrePassager();
+        if (aFits != bFits) {
+            return aFits ? -1 : 1;
+        }
+
+        // Priorité métier: le plus grand groupe passe d'abord.
+        int byPassengers = Integer.compare(clientB.getNombrePassager(), clientA.getNombrePassager());
+        if (byPassengers != 0) {
+            return byPassengers;
+        }
+
+        if (aFits && bFits) {
+            // Si les deux conviennent, minimiser le surplus.
+            int surplusA = vehiculeA.getNombrePlace() - clientA.getNombrePassager();
+            int surplusB = vehiculeB.getNombrePlace() - clientB.getNombrePassager();
+            if (surplusA != surplusB) {
+                return Integer.compare(surplusA, surplusB);
+            }
+        } else {
+            // Sinon (aucun ne convient), prendre la capacité la plus proche.
+            int diffA = Math.abs(vehiculeA.getNombrePlace() - clientA.getNombrePassager());
+            int diffB = Math.abs(vehiculeB.getNombrePlace() - clientB.getNombrePassager());
+            if (diffA != diffB) {
+                return Integer.compare(diffA, diffB);
+            }
+        }
+
+        int tripsA = historicalTripCounts.getOrDefault(vehiculeA.getId(), 0)
+                + countTrips(occupations, vehiculeA.getId());
+        int tripsB = historicalTripCounts.getOrDefault(vehiculeB.getId(), 0)
+                + countTrips(occupations, vehiculeB.getId());
+        if (tripsA != tripsB) {
+            return Integer.compare(tripsA, tripsB);
+        }
+
+        int byFuel = Integer.compare(
+                fuelPriority(vehiculeA.getTypeCarburant()),
+                fuelPriority(vehiculeB.getTypeCarburant()));
+        if (byFuel != 0) {
+            return byFuel;
+        }
+
+        return clientA.getDateArrivee().compareTo(clientB.getDateArrivee());
     }
 
     private long computeRetryAnchorTime(List<Reservation> unassigned, List<VehiculeOccupation> occupations) {
@@ -403,6 +712,8 @@ public class GroupingService {
         split.setId(source.getId());
         split.setClientId(source.getClientId());
         split.setNombrePassager(passengerCount);
+        split.setNombrePassagerOrigine(
+            source.getNombrePassagerOrigine() > 0 ? source.getNombrePassagerOrigine() : source.getNombrePassager());
         split.setDateArrivee(source.getDateArrivee());
         split.setHotelId(source.getHotelId());
         split.setAeroportId(source.getAeroportId());
@@ -413,6 +724,15 @@ public class GroupingService {
         split.setPrioriteAssignation(source.isPrioriteAssignation());
 
         return split;
+    }
+
+    private int priorityPassengerCount(Reservation reservation) {
+        if (reservation == null) {
+            return 0;
+        }
+        return reservation.getNombrePassagerOrigine() > 0
+                ? reservation.getNombrePassagerOrigine()
+                : reservation.getNombrePassager();
     }
 
     private int fuelPriority(String type) {
@@ -435,6 +755,8 @@ public class GroupingService {
     private static class VehicleWindowState {
         Vehicule vehicule;
         int remainingSeats;
+        long dispatchTimeMs;
+        long latestAssignedArrivalMs;
         List<Reservation> clients;
     }
 

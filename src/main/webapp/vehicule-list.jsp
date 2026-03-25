@@ -260,6 +260,7 @@
                     <th>ID</th>
                     <th>Référence</th>
                     <th>Nombre de places</th>
+                    <th>Disponibilité</th>
                     <th>Type de carburant</th>
                     <th>Actions</th>
                 </tr>
@@ -278,6 +279,16 @@
                     <td><%= v.getId() %></td>
                     <td><strong><%= v.getReference() %></strong></td>
                     <td><%= v.getNombrePlace() %></td>
+                    <td>
+                        <%
+                            String heureDispoAff = "00:00";
+                            if (v.getHeureDisponibilite() != null) {
+                                String rawHeure = v.getHeureDisponibilite().toString();
+                                heureDispoAff = rawHeure.length() >= 5 ? rawHeure.substring(0, 5) : rawHeure;
+                            }
+                        %>
+                        <%= heureDispoAff %>
+                    </td>
                     <td><span class="badge <%= badgeClass %>"><%= v.getTypeCarburantLibelle() %></span></td>
                     <td class="actions">
                         <a href="${pageContext.request.contextPath}/vehicule/edit?id=<%= v.getId() %>" 

@@ -135,6 +135,11 @@
             Boolean isEdit = (Boolean) request.getAttribute("isEdit");
             Vehicule vehicule = (Vehicule) request.getAttribute("vehicule");
             boolean editing = isEdit != null && isEdit;
+            String heureDisponibiliteValue = "00:00";
+            if (vehicule != null && vehicule.getHeureDisponibilite() != null) {
+                String rawHeure = vehicule.getHeureDisponibilite().toString();
+                heureDisponibiliteValue = rawHeure.length() >= 5 ? rawHeure.substring(0, 5) : rawHeure;
+            }
         %>
         
         <h1><%= editing ? "Modifier le Véhicule" : "Nouveau Véhicule" %></h1>
@@ -166,6 +171,12 @@
                 <input type="number" id="nombrePlace" name="nombrePlace" 
                        min="1" max="100" required
                        value="<%= vehicule != null ? vehicule.getNombrePlace() : "5" %>">
+            </div>
+
+            <div class="form-group">
+                <label for="heureDisponibilite">Heure de disponibilité</label>
+                <input type="time" id="heureDisponibilite" name="heureDisponibilite" required
+                       value="<%= heureDisponibiliteValue %>">
             </div>
 
             <div class="form-group">

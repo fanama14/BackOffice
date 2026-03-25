@@ -436,7 +436,7 @@
                 <svg viewBox="0 0 24 24" fill="none"><path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3" stroke="white" stroke-width="2" stroke-linecap="round"/><rect x="9" y="11" width="14" height="10" rx="2" stroke="white" stroke-width="2"/><path d="M12 16h2M16 16h2" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
             </div>
             <div>
-                <div class="brand-name">Transport Ops</div>
+                <div class="brand-name">3110 . 3222 . 3152</div>
                 <div class="brand-sub">BACK-OFFICE SYSTEM</div>
             </div>
         </div>
@@ -517,6 +517,7 @@
                     <th>ID</th>
                     <th>Référence</th>
                     <th>Places</th>
+                    <th>Disponibilité</th>
                     <th>Carburant</th>
                     <th>Actions</th>
                 </tr>
@@ -529,6 +530,16 @@
                     <td class="td-id">#<%= v.getId() %></td>
                     <td class="td-ref"><%= v.getReference() %></td>
                     <td class="td-places"><%= v.getNombrePlace() %><span style="font-family:var(--sans);font-size:11px;color:var(--muted);font-weight:400;margin-left:3px;">pl.</span></td>
+                    <td class="td-places">
+                        <%
+                            String heureDispoAff = "00:00";
+                            if (v.getHeureDisponibilite() != null) {
+                                String rawHeure = v.getHeureDisponibilite().toString();
+                                heureDispoAff = rawHeure.length() >= 5 ? rawHeure.substring(0, 5) : rawHeure;
+                            }
+                        %>
+                        <%= heureDispoAff %>
+                    </td>
                     <td>
                         <span class="fuel-badge <%= fuelClass %>">
                             <span class="fuel-dot"></span>

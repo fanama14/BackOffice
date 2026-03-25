@@ -13,7 +13,7 @@ public class VehiculeDAO {
      * Insère un nouveau véhicule
      */
     public void insert(Vehicule vehicule) throws SQLException {
-        String sql = "INSERT INTO vehicule (reference, nombre_place, type_carburant) VALUES (?, ?, ?)";
+        String sql = "INSERT INTO vehicule (reference, nombre_place, type_carburant, heure_disponibilite) VALUES (?, ?, ?, ?)";
 
         try (Connection conn = DatabaseConnection.getConnection();
                 PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -21,6 +21,10 @@ public class VehiculeDAO {
             ps.setString(1, vehicule.getReference());
             ps.setInt(2, vehicule.getNombrePlace());
             ps.setString(3, vehicule.getTypeCarburant());
+            Time heureDisponibilite = vehicule.getHeureDisponibilite() != null
+                    ? vehicule.getHeureDisponibilite()
+                    : Time.valueOf("00:00:00");
+            ps.setTime(4, heureDisponibilite);
             ps.executeUpdate();
         }
     }
@@ -29,7 +33,7 @@ public class VehiculeDAO {
      * Met à jour un véhicule existant
      */
     public void update(Vehicule vehicule) throws SQLException {
-        String sql = "UPDATE vehicule SET reference = ?, nombre_place = ?, type_carburant = ? WHERE id = ?";
+        String sql = "UPDATE vehicule SET reference = ?, nombre_place = ?, type_carburant = ?, heure_disponibilite = ? WHERE id = ?";
 
         try (Connection conn = DatabaseConnection.getConnection();
                 PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -37,7 +41,11 @@ public class VehiculeDAO {
             ps.setString(1, vehicule.getReference());
             ps.setInt(2, vehicule.getNombrePlace());
             ps.setString(3, vehicule.getTypeCarburant());
-            ps.setInt(4, vehicule.getId());
+            Time heureDisponibilite = vehicule.getHeureDisponibilite() != null
+                    ? vehicule.getHeureDisponibilite()
+                    : Time.valueOf("00:00:00");
+            ps.setTime(4, heureDisponibilite);
+            ps.setInt(5, vehicule.getId());
             ps.executeUpdate();
         }
     }
@@ -60,7 +68,7 @@ public class VehiculeDAO {
      */
     public List<Vehicule> findAll() throws SQLException {
         List<Vehicule> vehicules = new ArrayList<>();
-        String sql = "SELECT id, reference, nombre_place, type_carburant FROM vehicule ORDER BY reference";
+        String sql = "SELECT id, reference, nombre_place, type_carburant, heure_disponibilite FROM vehicule ORDER BY reference";
 
         try (Connection conn = DatabaseConnection.getConnection();
                 PreparedStatement ps = conn.prepareStatement(sql);
@@ -78,7 +86,7 @@ public class VehiculeDAO {
      * Recherche un véhicule par son ID
      */
     public Vehicule findById(int id) throws SQLException {
-        String sql = "SELECT id, reference, nombre_place, type_carburant FROM vehicule WHERE id = ?";
+        String sql = "SELECT id, reference, nombre_place, type_carburant, heure_disponibilite FROM vehicule WHERE id = ?";
 
         try (Connection conn = DatabaseConnection.getConnection();
                 PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -105,7 +113,7 @@ public class VehiculeDAO {
     public List<Vehicule> findBestVehicles(int nombrePassager) throws SQLException {
         List<Vehicule> vehicules = new ArrayList<>();
 
-        String sql = "SELECT v.id, v.reference, v.nombre_place, v.type_carburant " +
+        String sql = "SELECT v.id, v.reference, v.nombre_place, v.type_carburant, v.heure_disponibilite " +
                 "FROM vehicule v " +
                 "WHERE v.nombre_place >= ? " +
                 "ORDER BY " +
@@ -156,7 +164,7 @@ public class VehiculeDAO {
         // tempsTrajet * 2]
         // (aller-retour estimé)
 
-        String sql = "SELECT v.id, v.reference, v.nombre_place, v.type_carburant " +
+        String sql = "SELECT v.id, v.reference, v.nombre_place, v.type_carburant, v.heure_disponibilite " +
                 "FROM vehicule v " +
                 "WHERE v.nombre_place >= ? " +
                 "AND v.id NOT IN (" +
@@ -245,7 +253,7 @@ public class VehiculeDAO {
 
         List<Vehicule> vehicules = new ArrayList<>();
         StringBuilder sql = new StringBuilder(
-                "SELECT id, reference, nombre_place, type_carburant FROM vehicule WHERE 1=1");
+            "SELECT id, reference, nombre_place, type_carburant, heure_disponibilite FROM vehicule WHERE 1=1");
         List<Object> params = new ArrayList<>();
 
         // Filtre recherche textuelle
@@ -305,6 +313,8 @@ public class VehiculeDAO {
         v.setReference(rs.getString("reference"));
         v.setNombrePlace(rs.getInt("nombre_place"));
         v.setTypeCarburant(rs.getString("type_carburant"));
+        Time heureDisponibilite = rs.getTime("heure_disponibilite");
+        v.setHeureDisponibilite(heureDisponibilite != null ? heureDisponibilite : Time.valueOf("00:00:00"));
         return v;
     }
 }

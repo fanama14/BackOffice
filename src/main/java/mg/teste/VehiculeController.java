@@ -10,6 +10,7 @@ import mg.framework.ModelView;
 import com.backoffice.dao.VehiculeDAO;
 import com.backoffice.model.Vehicule;
 
+import java.sql.Time;
 import java.util.List;
 
 @Controller
@@ -75,7 +76,8 @@ public class VehiculeController {
             @RequestParam("id") String idStr,
             @RequestParam("reference") String reference,
             @RequestParam("nombrePlace") int nombrePlace,
-            @RequestParam("typeCarburant") String typeCarburant) {
+            @RequestParam("typeCarburant") String typeCarburant,
+            @RequestParam("heureDisponibilite") String heureDisponibiliteStr) {
 
         ModelView mv = new ModelView("vehicule-form");
         try {
@@ -83,6 +85,7 @@ public class VehiculeController {
             vehicule.setReference(reference);
             vehicule.setNombrePlace(nombrePlace);
             vehicule.setTypeCarburant(typeCarburant);
+            vehicule.setHeureDisponibilite(parseTimeOrDefault(heureDisponibiliteStr));
 
             Integer id = parseIntOrNull(idStr);
 
@@ -142,6 +145,21 @@ public class VehiculeController {
             return Integer.parseInt(value.trim());
         } catch (NumberFormatException e) {
             return null;
+        }
+    }
+
+    private Time parseTimeOrDefault(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return Time.valueOf("00:00:00");
+        }
+        String normalized = value.trim();
+        if (normalized.length() == 5) {
+            normalized = normalized + ":00";
+        }
+        try {
+            return Time.valueOf(normalized);
+        } catch (IllegalArgumentException e) {
+            return Time.valueOf("00:00:00");
         }
     }
 }

@@ -36,28 +36,18 @@ UPDATE hotel SET distance_aeroport = 12.0 WHERE nom = 'Palm Resort';
 UPDATE hotel SET distance_aeroport = 45.0 WHERE nom = 'Highland Inn';
 UPDATE hotel SET distance_aeroport = 8.5 WHERE nom = 'Lagoon Palace';
 
--- ============================
--- Données de test pour les règles d'assignation de véhicules
--- ============================
 
--- Supprimer les anciennes données de test si nécessaire
 DELETE FROM reservation WHERE client_id LIKE 'TEST%';
 
--- Véhicules supplémentaires pour tester les règles d'assignation
-INSERT INTO vehicule (reference, nombre_place, type_carburant) VALUES
-('VH-006', 4, 'D'),      -- 4 places Diesel (priorité sur VH-003 qui est EL)
-('VH-007', 4, 'ES'),     -- 4 places Essence (entre D et EL)
-('VH-008', 5, 'D'),      -- 5 places Diesel (priorité sur VH-001 ES et VH-004 H)
-('VH-009', 7, 'ES'),     -- 7 places Essence
-('VH-010', 7, 'H'),      -- 7 places Hybride
-('VH-011', 9, 'EL'),     -- 9 places Electrique
-('VH-012', 12, 'D');     -- 12 places Diesel (minibus)
+INSERT INTO vehicule (reference, nombre_place, type_carburant, heure_disponibilite) VALUES
+('VH-006', 4, 'D', '00:00:00'),      -- 4 places Diesel (priorité sur VH-003 qui est EL)
+('VH-007', 4, 'ES', '00:00:00'),     -- 4 places Essence (entre D et EL)
+('VH-008', 5, 'D', '00:00:00'),      -- 5 places Diesel (priorité sur VH-001 ES et VH-004 H)
+('VH-009', 7, 'ES', '00:00:00'),     -- 7 places Essence
+('VH-010', 7, 'H', '00:00:00'),      -- 7 places Hybride
+('VH-011', 9, 'EL', '00:00:00'),     -- 9 places Electrique
+('VH-012', 12, 'D', '00:00:00');     -- 12 places Diesel (minibus)
 
--- Réservations de test avec différents nombres de passagers
--- Pour tester les règles d'assignation:
--- 1. Voiture avec places >= nombre_passager
--- 2. Voiture avec places le plus proche du nombre de passagers
--- 3. Priorité: D > ES > H > EL
 
 -- Réservations pour le 05/03/2026 (matin)
 INSERT INTO reservation (client_id, nombre_passager, date_arrivee, hotel_id) VALUES

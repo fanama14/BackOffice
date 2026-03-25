@@ -5,6 +5,7 @@ import java.sql.Timestamp;
 public class Planification {
     private int id;
     private int reservationId;
+    private int nbPassagersAffectes;
     private Integer vehiculeId;
     private int groupeId;
     private int ordreLivraison;
@@ -28,6 +29,14 @@ public class Planification {
 
     public void setReservationId(int reservationId) {
         this.reservationId = reservationId;
+    }
+
+    public int getNbPassagersAffectes() {
+        return nbPassagersAffectes;
+    }
+
+    public void setNbPassagersAffectes(int nbPassagersAffectes) {
+        this.nbPassagersAffectes = nbPassagersAffectes;
     }
 
     public Integer getVehiculeId() {

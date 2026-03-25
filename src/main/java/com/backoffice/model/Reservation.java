@@ -25,7 +25,8 @@ public class Reservation {
     // Champs de regroupement
     private int groupeId;         // identifiant du groupe de regroupement
     private int ordreLivraison;   // ordre de livraison dans le groupe (1 = livré en premier)
-    private boolean prioriteAssignation; // true si reliquat issu d'un split à traiter en priorité
+    private boolean prioriteAssignation; // true si reliquat reporté d'une fenêtre précédente
+    private int nombrePassagerOrigine; // taille initiale de la réservation avant split
 
     public Reservation() {
     }
@@ -173,5 +174,13 @@ public class Reservation {
 
     public void setPrioriteAssignation(boolean prioriteAssignation) {
         this.prioriteAssignation = prioriteAssignation;
+    }
+
+    public int getNombrePassagerOrigine() {
+        return nombrePassagerOrigine;
+    }
+
+    public void setNombrePassagerOrigine(int nombrePassagerOrigine) {
+        this.nombrePassagerOrigine = nombrePassagerOrigine;
     }
 }
