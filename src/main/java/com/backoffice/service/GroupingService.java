@@ -177,6 +177,11 @@ public class GroupingService {
 
                 // Ordre de base: nb passagers décroissant puis arrivée.
                 windowClients.sort((a, b) -> {
+                    boolean aSeparatedUnassigned = isSeparatedUnassigned(a);
+                    boolean bSeparatedUnassigned = isSeparatedUnassigned(b);
+                    if (aSeparatedUnassigned != bSeparatedUnassigned) {
+                        return aSeparatedUnassigned ? -1 : 1;
+                    }
                     if (a.isPrioriteAssignation() != b.isPrioriteAssignation()) {
                         return a.isPrioriteAssignation() ? -1 : 1;
                     }
@@ -316,8 +321,8 @@ public class GroupingService {
                     int remainderPassengers = seedClient.getNombrePassager() - allocated;
                     if (remainderPassengers > 0) {
                         Reservation remainder = splitReservation(seedClient, remainderPassengers);
-                        // Un reliquat dans la même fenêtre est un "reste", pas encore un non assigné reporté.
-                        remainder.setPrioriteAssignation(false);
+                        // Un reliquat séparé est prioritaire face aux réservations complètes.
+                        remainder.setPrioriteAssignation(true);
                         pendingClients.add(remainder);
                     }
 
@@ -380,7 +385,7 @@ public class GroupingService {
                 }
 
                 for (Reservation carry : nextUnassigned) {
-                    carry.setPrioriteAssignation(true);
+                    carry.setPrioriteAssignation(isSeparatedUnassigned(carry));
                 }
                 unassigned = nextUnassigned;
                 i = j;
@@ -606,6 +611,15 @@ public class GroupingService {
                 continue;
             }
 
+            boolean rSeparatedUnassigned = isSeparatedUnassigned(r);
+            boolean bestSeparatedUnassigned = isSeparatedUnassigned(best);
+            if (rSeparatedUnassigned != bestSeparatedUnassigned) {
+                if (rSeparatedUnassigned) {
+                    best = r;
+                }
+                continue;
+            }
+
             if (r.isPrioriteAssignation() != best.isPrioriteAssignation()) {
                 if (r.isPrioriteAssignation()) {
                     best = r;
@@ -712,8 +726,8 @@ public class GroupingService {
             int remainderPassengers = candidate.getNombrePassager() - allocated;
             if (remainderPassengers > 0) {
                 Reservation remainder = splitReservation(candidate, remainderPassengers);
-                // Tant que la fenêtre courante n'est pas close, on garde ce reliquat comme "reste".
-                remainder.setPrioriteAssignation(false);
+                // Un reliquat séparé est prioritaire face aux réservations complètes.
+                remainder.setPrioriteAssignation(true);
                 pendingClients.add(remainder);
             }
         }
@@ -738,7 +752,7 @@ public class GroupingService {
             return false;
         }
         for (Reservation reservation : reservations) {
-            if (reservation.isPrioriteAssignation()) {
+            if (isSeparatedUnassigned(reservation)) {
                 return true;
             }
         }
@@ -748,7 +762,7 @@ public class GroupingService {
     private Reservation selectHighestPriorityPrioritizedClient(List<Reservation> clients) {
         Reservation best = null;
         for (Reservation reservation : clients) {
-            if (!reservation.isPrioriteAssignation()) {
+            if (!isSeparatedUnassigned(reservation)) {
                 continue;
             }
 
@@ -777,6 +791,14 @@ public class GroupingService {
             }
         }
         return best;
+    }
+
+    private boolean isSeparatedUnassigned(Reservation reservation) {
+        if (reservation == null) {
+            return false;
+        }
+        return reservation.getNombrePassagerOrigine() > 0
+                && reservation.getNombrePassager() < reservation.getNombrePassagerOrigine();
     }
 
     private boolean canDepartImmediatelyFromAvailability(VehicleWindowState state) {

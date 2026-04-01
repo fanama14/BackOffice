@@ -49,12 +49,12 @@ INSERT INTO distance (lieux_from, lieux_to, valeur) VALUES
 -- Capacite totale instantanee = 12, demande = 14 => 2 non assignes
 -- ====================================================
 INSERT INTO reservation (client_id, nombre_passager, date_arrivee, hotel_id, aeroport_id) VALUES
-('c1', 14, '2026-04-01 08:00:00', 1, 1);
+('c1', 14, '2026-04-01 08:45:00', 1, 1);
 
 -- Reservation suivante proche:
 -- en theorie les non assignes precedents restent prioritaires
 INSERT INTO reservation (client_id, nombre_passager, date_arrivee, hotel_id, aeroport_id) VALUES
-('c2', 12, '2026-04-01 08:05:00', 1, 1);
+('c2', 15, '2026-04-01 08:05:00', 1, 1);
 
 -- ====================================================
 -- CAS 2: regroupement declenche par retour vehicule
