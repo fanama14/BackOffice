@@ -53,13 +53,13 @@ INSERT INTO distance (lieux_from, lieux_to, valeur) VALUES
 (2, 3, 60),
 (2, 1, 100),
 (3, 1, 140),
-(3, 2, 60);x
+(3, 2, 60);
 
 -- Reservations (aeroport_id=1, hotel_id 1=hotel1 / 2=hotel2)
 INSERT INTO reservation (client_id, nombre_passager, date_arrivee, hotel_id, aeroport_id) VALUES
 ('client1', 7,  '2026-03-19 09:00:00', 1, 1),
 ('client2', 20, '2026-03-19 08:00:00', 2, 1),
-('client3', 3,  '2026-03-19 09:10:00', 1, 1)
+('client3', 3,  '2026-03-19 09:10:00', 1, 1),
 ('client4', 10, '2026-03-19 09:15:00', 1, 1),
 ('client5', 5,  '2026-03-19 09:20:00', 1, 1),
 ('client6', 12, '2026-03-19 13:30:00', 1, 1);
