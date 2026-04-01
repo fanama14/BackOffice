@@ -54,15 +54,11 @@ INSERT INTO reservation (client_id, nombre_passager, date_arrivee, hotel_id, aer
 -- Reservation suivante proche:
 -- en theorie les non assignes precedents restent prioritaires
 INSERT INTO reservation (client_id, nombre_passager, date_arrivee, hotel_id, aeroport_id) VALUES
-('c2', 2, '2026-04-01 08:05:00', 1, 1);
+('c2', 12, '2026-04-01 08:05:00', 1, 1);
 
 -- ====================================================
 -- CAS 2: regroupement declenche par retour vehicule
 -- Reservation a 09:00, alors que les vehicules sont encore en course
 -- => la planification doit attendre un retour de disponibilite
--- Demande = 8 (2 vehicules pleins), sans non assignes
--- ====================================================
-INSERT INTO reservation (client_id, nombre_passager, date_arrivee, hotel_id, aeroport_id) VALUES
-('c3', 8, '2026-04-01 12:00:00', 1, 1);
-
+-- Demande = 8 (2 vehicules pleins), sans non assig
 COMMIT;
