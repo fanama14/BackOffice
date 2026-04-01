@@ -48,12 +48,9 @@ INSERT INTO parametre (temps_attente, vitesse_moyenne) VALUES
 -- 3: hotel1   -> hotel2
 -- Ajout des sens inverses pour securiser les calculs.
 INSERT INTO distance (lieux_from, lieux_to, valeur) VALUES
-(1, 2, 100),
-(1, 3, 140),
-(2, 3, 60),
-(2, 1, 100),
-(3, 1, 140),
-(3, 2, 60);
+(1, 2, 90),
+(1, 3, 35),
+(2, 3, 60);
 
 -- Reservations (aeroport_id=1, hotel_id 1=hotel1 / 2=hotel2)
 INSERT INTO reservation (client_id, nombre_passager, date_arrivee, hotel_id, aeroport_id) VALUES

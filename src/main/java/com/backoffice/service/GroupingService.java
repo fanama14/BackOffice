@@ -172,6 +172,9 @@ public class GroupingService {
 
                 // Ordre de base: nb passagers décroissant puis arrivée.
                 windowClients.sort((a, b) -> {
+                    if (a.isPrioriteAssignation() != b.isPrioriteAssignation()) {
+                        return a.isPrioriteAssignation() ? -1 : 1;
+                    }
                     int byOrigin = Integer.compare(priorityPassengerCount(b), priorityPassengerCount(a));
                     if (byOrigin != 0) {
                         return byOrigin;
@@ -299,9 +302,16 @@ public class GroupingService {
                 // Créer les groupes pour chaque véhicule assigné
                 for (VehicleWindowState state : vehicleStates.values()) {
                     long baseDepartureMs = Math.max(state.latestAssignedArrivalMs, state.dispatchTimeMs);
-                    long departureMs = windowAnchorType == WindowAnchorType.RESERVATION
-                        ? Math.max(baseDepartureMs, latestWindowReservationArrivalMs)
-                        : baseDepartureMs;
+                    long taDepartureFloorMs = Math.max(baseDepartureMs, latestWindowReservationArrivalMs);
+                    boolean isFull = state.remainingSeats == 0;
+                    boolean containsUnassigned = containsPrioritizedPassengers(state.clients);
+                    boolean canDepartDirectly = isFull && containsUnassigned;
+                    long departureMs;
+                    if (windowAnchorType == WindowAnchorType.RESERVATION) {
+                        departureMs = taDepartureFloorMs;
+                    } else {
+                        departureMs = canDepartDirectly ? baseDepartureMs : taDepartureFloorMs;
+                    }
                     Timestamp departureTime = new Timestamp(departureMs);
                     ReservationGroup group = new ReservationGroup();
                     group.setVehicule(state.vehicule);
@@ -545,6 +555,13 @@ public class GroupingService {
                 continue;
             }
 
+            if (r.isPrioriteAssignation() != best.isPrioriteAssignation()) {
+                if (r.isPrioriteAssignation()) {
+                    best = r;
+                }
+                continue;
+            }
+
             int byOrigin = Integer.compare(priorityPassengerCount(r), priorityPassengerCount(best));
             if (byOrigin > 0) {
                 best = r;
@@ -645,6 +662,18 @@ public class GroupingService {
         }
 
         return latestArrival;
+    }
+
+    private boolean containsPrioritizedPassengers(List<Reservation> reservations) {
+        if (reservations == null) {
+            return false;
+        }
+        for (Reservation reservation : reservations) {
+            if (reservation.isPrioriteAssignation()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private int compareClientsForVehicleStart(Reservation a, Reservation b) {
