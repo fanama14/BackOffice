@@ -29,11 +29,11 @@ INSERT INTO hotel (nom, adresse, ville, lieux_id) VALUES
 INSERT INTO aeroport (code, libelle, lieux_id) VALUES
 ('AER', 'aeroport', 1);
 
--- 3 vehicules simples, tous disponibles a minuit
+ 
+-- 2 vehicules simples, tous disponibles a minuit
 INSERT INTO vehicule (reference, nombre_place, type_carburant, heure_disponibilite) VALUES
 ('vehicule1', 4, 'D',  '00:00:00'),
-('vehicule2', 4, 'ES', '00:00:00'),
-('vehicule3', 4, 'D',  '00:00:00');
+('vehicule2', 4, 'ES', '00:00:00');
 
 -- Parametre global
 INSERT INTO parametre (temps_attente, vitesse_moyenne) VALUES
@@ -49,18 +49,20 @@ INSERT INTO distance (lieux_from, lieux_to, valeur) VALUES
 -- Capacite totale instantanee = 12, demande = 14 => 2 non assignes
 -- ====================================================
 INSERT INTO reservation (client_id, nombre_passager, date_arrivee, hotel_id, aeroport_id) VALUES
-('client_non_assigne_1', 14, '2026-04-01 08:00:00', 1, 1);
+('c1', 14, '2026-04-01 08:00:00', 1, 1);
 
 -- Reservation suivante proche:
 -- en theorie les non assignes precedents restent prioritaires
 INSERT INTO reservation (client_id, nombre_passager, date_arrivee, hotel_id, aeroport_id) VALUES
-('client_apres_non_assigne', 2, '2026-04-01 08:05:00', 1, 1);
+('c2', 2, '2026-04-01 08:05:00', 1, 1);
 
 -- ====================================================
--- CAS 2: vehicules pleins, sans non assignes
--- Demande = 12 pour capacite totale = 12
+-- CAS 2: regroupement declenche par retour vehicule
+-- Reservation a 09:00, alors que les vehicules sont encore en course
+-- => la planification doit attendre un retour de disponibilite
+-- Demande = 8 (2 vehicules pleins), sans non assignes
 -- ====================================================
 INSERT INTO reservation (client_id, nombre_passager, date_arrivee, hotel_id, aeroport_id) VALUES
-('client_vehicules_pleins', 12, '2026-04-01 12:00:00', 1, 1);
+('c3', 8, '2026-04-01 12:00:00', 1, 1);
 
 COMMIT;

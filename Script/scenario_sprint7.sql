@@ -32,10 +32,10 @@ INSERT INTO aeroport (code, libelle, lieux_id) VALUES
 -- Vehicules
 -- type_carburant: D=Diesel, ES=Essence
 INSERT INTO vehicule (reference, nombre_place, type_carburant, heure_disponibilite) VALUES
-('vehicule1', 5,  'D',  '00:00:00'),
-('vehicule2', 5,  'ES', '00:00:00'),
+('vehicule1', 5,  'D',  '09:00:00'),
+('vehicule2', 5,  'ES', '09:00:00'),
 ('vehicule3', 12, 'D',  '00:00:00'),
-('vehicule4', 9,  'D',  '00:00:00'),
+('vehicule4', 9,  'D',  '09:00:00'),
 ('vehicule5', 12, 'ES', '13:00:00');
 
 -- Parametre global
