@@ -117,10 +117,14 @@ public class GroupingService {
                         }
                     }
 
-                    // Évite la boucle infinie: si aucune nouvelle réservation n'entre
-                    // dans la fenêtre de reprise, on force l'ancrage sur la prochaine
-                    // réservation pour faire progresser l'index i.
-                    if (windowNew.isEmpty() && i < dayReservations.size()) {
+                        // Évite la boucle infinie: si aucune nouvelle réservation n'entre
+                        // dans la fenêtre de reprise, on force l'ancrage sur la prochaine
+                        // réservation uniquement quand l'ancre est déjà une réservation.
+                        // Si l'ancre vient d'un retour véhicule, on doit traiter les NA
+                        // même sans nouvelle réservation dans la fenêtre courante.
+                        if (windowAnchorType == WindowAnchorType.RESERVATION
+                            && windowNew.isEmpty()
+                            && i < dayReservations.size()) {
                         Reservation nextAnchor = dayReservations.get(i);
                         anchorTime = nextAnchor.getDateArrivee().getTime();
                         windowAnchorType = WindowAnchorType.RESERVATION;
