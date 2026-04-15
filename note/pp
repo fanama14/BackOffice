@@ -1,0 +1,7 @@
+cree moi des donnees super simple, pas tres longs, qui traite le cas ou si 
+par exemple y a des personnes non assgnes qui sont restees(normalement ils sont toujours prioritaire lorsqu il
+y a une voiture disponible), puis des donnee avec les voitures remplies(mais ne comprends pas de personnes non assignes)
+
+Je veux juste des donnees comportant ces caracteristiques,
+le dernier donnee de sprint est celui de scenario-sprint 7.sql, donc 
+refere toi a ce fichier, cree un autre sql test dans le meme dossier

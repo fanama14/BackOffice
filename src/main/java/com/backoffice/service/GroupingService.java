@@ -82,10 +82,12 @@ public class GroupingService {
         for (List<Reservation> dayReservations : byDay.values()) {
             List<Reservation> unassigned = new ArrayList<>();
             int i = 0;
+            long previousWindowEndMs = Long.MIN_VALUE;
 
             while (i < dayReservations.size() || !unassigned.isEmpty()) {
                 long anchorTime;
                 long currentWindowEndMs;
+                WindowAnchorType windowAnchorType;
                 List<Reservation> windowNew = new ArrayList<>();
                 int j = i;
 
@@ -93,7 +95,17 @@ public class GroupingService {
                     // Tant qu'il existe des reliquats, on ancre d'abord la fenêtre
                     // sur le prochain instant utile. Les nouvelles réservations ne sont
                     // intégrées que si elles tombent dans cette même fenêtre de reprise.
-                    anchorTime = computeRetryAnchorTime(unassigned, occupations);
+                    Long nextReservationTime = i < dayReservations.size()
+                            ? dayReservations.get(i).getDateArrivee().getTime()
+                            : null;
+                        RetryAnchor retryAnchor = computeRetryAnchor(
+                            unassigned,
+                            occupations,
+                            allVehicules,
+                            nextReservationTime,
+                            previousWindowEndMs);
+                    anchorTime = retryAnchor.timeMs;
+                    windowAnchorType = retryAnchor.type;
                     currentWindowEndMs = anchorTime + (tempsAttenteMin * 60 * 1000L);
                     j = i;
                     while (j < dayReservations.size()) {
@@ -105,12 +117,17 @@ public class GroupingService {
                         }
                     }
 
-                    // Évite la boucle infinie: si aucune nouvelle réservation n'entre
-                    // dans la fenêtre de reprise, on force l'ancrage sur la prochaine
-                    // réservation pour faire progresser l'index i.
-                    if (windowNew.isEmpty() && i < dayReservations.size()) {
+                        // Évite la boucle infinie: si aucune nouvelle réservation n'entre
+                        // dans la fenêtre de reprise, on force l'ancrage sur la prochaine
+                        // réservation uniquement quand l'ancre est déjà une réservation.
+                        // Si l'ancre vient d'un retour véhicule, on doit traiter les NA
+                        // même sans nouvelle réservation dans la fenêtre courante.
+                        if (windowAnchorType == WindowAnchorType.RESERVATION
+                            && windowNew.isEmpty()
+                            && i < dayReservations.size()) {
                         Reservation nextAnchor = dayReservations.get(i);
                         anchorTime = nextAnchor.getDateArrivee().getTime();
+                        windowAnchorType = WindowAnchorType.RESERVATION;
                         currentWindowEndMs = anchorTime + (tempsAttenteMin * 60 * 1000L);
                         windowNew.add(nextAnchor);
                         j = i + 1;
@@ -127,6 +144,7 @@ public class GroupingService {
                     // Ancre = première réservation non traitée
                     Reservation anchor = dayReservations.get(i);
                     anchorTime = anchor.getDateArrivee().getTime();
+                    windowAnchorType = WindowAnchorType.RESERVATION;
                     currentWindowEndMs = anchorTime + (tempsAttenteMin * 60 * 1000L);
 
                     // Collecter les nouvelles réservations dans la fenêtre
@@ -148,9 +166,25 @@ public class GroupingService {
                 List<Reservation> windowClients = new ArrayList<>();
                 windowClients.addAll(unassigned);
                 windowClients.addAll(windowNew);
+                previousWindowEndMs = currentWindowEndMs;
+
+                long latestWindowReservationArrivalMs = anchorTime;
+                for (Reservation reservation : windowNew) {
+                    latestWindowReservationArrivalMs = Math.max(
+                            latestWindowReservationArrivalMs,
+                            reservation.getDateArrivee().getTime());
+                }
 
                 // Ordre de base: nb passagers décroissant puis arrivée.
                 windowClients.sort((a, b) -> {
+                    boolean aSeparatedUnassigned = isSeparatedUnassigned(a);
+                    boolean bSeparatedUnassigned = isSeparatedUnassigned(b);
+                    if (aSeparatedUnassigned != bSeparatedUnassigned) {
+                        return aSeparatedUnassigned ? -1 : 1;
+                    }
+                    if (a.isPrioriteAssignation() != b.isPrioriteAssignation()) {
+                        return a.isPrioriteAssignation() ? -1 : 1;
+                    }
                     int byOrigin = Integer.compare(priorityPassengerCount(b), priorityPassengerCount(a));
                     if (byOrigin != 0) {
                         return byOrigin;
@@ -217,6 +251,30 @@ public class GroupingService {
                             continue;
                         candidates.add(v);
                     }
+
+                    boolean hasFitNow = false;
+                    for (Vehicule candidateVehicule : candidates) {
+                        if (candidateVehicule.getNombrePlace() >= seedClient.getNombrePassager()) {
+                            hasFitNow = true;
+                            break;
+                        }
+                    }
+
+                    if (!hasFitNow) {
+                        Long nextFitAvailability = findNextFittingVehicleAvailabilityTime(
+                                allVehicules,
+                                vehicleStates,
+                                occupations,
+                                dispatchTimeMs,
+                                seedClient.getNombrePassager());
+                        if (nextFitAvailability != null
+                                && nextFitAvailability > dispatchTimeMs
+                                && nextFitAvailability <= currentWindowEndMs) {
+                            dispatchTimeMs = nextFitAvailability;
+                            continue;
+                        }
+                    }
+
                     Vehicule chosen = null;
                     for (Vehicule candidateVehicule : candidates) {
                         if (chosen == null || compareVehicleClientPair(
@@ -263,6 +321,7 @@ public class GroupingService {
                     int remainderPassengers = seedClient.getNombrePassager() - allocated;
                     if (remainderPassengers > 0) {
                         Reservation remainder = splitReservation(seedClient, remainderPassengers);
+                        // Un reliquat séparé est prioritaire face aux réservations complètes.
                         remainder.setPrioriteAssignation(true);
                         pendingClients.add(remainder);
                     }
@@ -277,8 +336,11 @@ public class GroupingService {
 
                 // Créer les groupes pour chaque véhicule assigné
                 for (VehicleWindowState state : vehicleStates.values()) {
-                    Timestamp departureTime = new Timestamp(
-                            Math.max(state.latestAssignedArrivalMs, state.dispatchTimeMs));
+                    long baseDepartureMs = Math.max(state.latestAssignedArrivalMs, state.dispatchTimeMs);
+                    long taDepartureFloorMs = Math.max(baseDepartureMs, latestWindowReservationArrivalMs);
+                    boolean canDepartDirectly = canDepartImmediatelyFromAvailability(state);
+                    long departureMs = canDepartDirectly ? baseDepartureMs : taDepartureFloorMs;
+                    Timestamp departureTime = new Timestamp(departureMs);
                     ReservationGroup group = new ReservationGroup();
                     group.setVehicule(state.vehicule);
                     group.setHeureDepartAeroport(departureTime);
@@ -323,7 +385,7 @@ public class GroupingService {
                 }
 
                 for (Reservation carry : nextUnassigned) {
-                    carry.setPrioriteAssignation(true);
+                    carry.setPrioriteAssignation(isSeparatedUnassigned(carry));
                 }
                 unassigned = nextUnassigned;
                 i = j;
@@ -445,6 +507,34 @@ public class GroupingService {
         return bestFitTime != null ? bestFitTime : bestAnyTime;
     }
 
+    private Long findNextFittingVehicleAvailabilityTime(
+            List<Vehicule> allVehicules,
+            Map<Integer, VehicleWindowState> vehicleStates,
+            List<VehiculeOccupation> occupations,
+            long fromTime,
+            int requiredPassengers) {
+
+        Long bestFitTime = null;
+
+        for (Vehicule v : allVehicules) {
+            if (v.getNombrePlace() <= 0)
+                continue;
+            if (v.getNombrePlace() < requiredPassengers)
+                continue;
+            if (vehicleStates.containsKey(v.getId()))
+                continue;
+
+            long next = Math.max(fromTime, computeInitialAvailabilityTime(v, fromTime));
+            next = getBusyUntil(occupations, v.getId(), next);
+
+            if (bestFitTime == null || next < bestFitTime) {
+                bestFitTime = next;
+            }
+        }
+
+        return bestFitTime;
+    }
+
     private long computeInitialAvailabilityTime(Vehicule vehicule, long referenceTimeMs) {
         if (vehicule == null || vehicule.getHeureDisponibilite() == null) {
             return referenceTimeMs;
@@ -518,6 +608,22 @@ public class GroupingService {
         for (Reservation r : clients) {
             if (best == null) {
                 best = r;
+                continue;
+            }
+
+            boolean rSeparatedUnassigned = isSeparatedUnassigned(r);
+            boolean bestSeparatedUnassigned = isSeparatedUnassigned(best);
+            if (rSeparatedUnassigned != bestSeparatedUnassigned) {
+                if (rSeparatedUnassigned) {
+                    best = r;
+                }
+                continue;
+            }
+
+            if (r.isPrioriteAssignation() != best.isPrioriteAssignation()) {
+                if (r.isPrioriteAssignation()) {
+                    best = r;
+                }
                 continue;
             }
 
@@ -601,7 +707,12 @@ public class GroupingService {
         long latestArrival = state.latestAssignedArrivalMs;
 
         while (state.remainingSeats > 0 && !pendingClients.isEmpty()) {
-            Reservation candidate = selectBestClientForRemainingSeats(pendingClients, state.remainingSeats, true);
+            Reservation candidate;
+            if (hasPrioritizedPending(pendingClients)) {
+                candidate = selectHighestPriorityPrioritizedClient(pendingClients);
+            } else {
+                candidate = selectBestClientForRemainingSeats(pendingClients, state.remainingSeats, true);
+            }
             if (candidate == null) {
                 break;
             }
@@ -615,12 +726,101 @@ public class GroupingService {
             int remainderPassengers = candidate.getNombrePassager() - allocated;
             if (remainderPassengers > 0) {
                 Reservation remainder = splitReservation(candidate, remainderPassengers);
+                // Un reliquat séparé est prioritaire face aux réservations complètes.
                 remainder.setPrioriteAssignation(true);
                 pendingClients.add(remainder);
             }
         }
 
         return latestArrival;
+    }
+
+    private boolean containsPrioritizedPassengers(List<Reservation> reservations) {
+        if (reservations == null) {
+            return false;
+        }
+        for (Reservation reservation : reservations) {
+            if (reservation.isPrioriteAssignation()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasPrioritizedPending(List<Reservation> reservations) {
+        if (reservations == null) {
+            return false;
+        }
+        for (Reservation reservation : reservations) {
+            if (isSeparatedUnassigned(reservation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Reservation selectHighestPriorityPrioritizedClient(List<Reservation> clients) {
+        Reservation best = null;
+        for (Reservation reservation : clients) {
+            if (!isSeparatedUnassigned(reservation)) {
+                continue;
+            }
+
+            if (best == null) {
+                best = reservation;
+                continue;
+            }
+
+            int byOrigin = Integer.compare(priorityPassengerCount(reservation), priorityPassengerCount(best));
+            if (byOrigin > 0) {
+                best = reservation;
+                continue;
+            }
+            if (byOrigin < 0) {
+                continue;
+            }
+
+            int byPassengers = Integer.compare(reservation.getNombrePassager(), best.getNombrePassager());
+            if (byPassengers > 0) {
+                best = reservation;
+                continue;
+            }
+
+            if (byPassengers == 0 && reservation.getDateArrivee().before(best.getDateArrivee())) {
+                best = reservation;
+            }
+        }
+        return best;
+    }
+
+    private boolean isSeparatedUnassigned(Reservation reservation) {
+        if (reservation == null) {
+            return false;
+        }
+        return reservation.getNombrePassagerOrigine() > 0
+                && reservation.getNombrePassager() < reservation.getNombrePassagerOrigine();
+    }
+
+    private boolean canDepartImmediatelyFromAvailability(VehicleWindowState state) {
+        if (state == null || state.remainingSeats != 0) {
+            return false;
+        }
+
+        if (!containsPrioritizedPassengers(state.clients)) {
+            return false;
+        }
+
+        for (Reservation reservation : state.clients) {
+            if (reservation.isPrioriteAssignation()) {
+                continue;
+            }
+            if (reservation.getDateArrivee() == null
+                    || reservation.getDateArrivee().getTime() != state.dispatchTimeMs) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private int compareClientsForVehicleStart(Reservation a, Reservation b) {
@@ -688,7 +888,14 @@ public class GroupingService {
         return clientA.getDateArrivee().compareTo(clientB.getDateArrivee());
     }
 
-    private long computeRetryAnchorTime(List<Reservation> unassigned, List<VehiculeOccupation> occupations) {
+        private RetryAnchor computeRetryAnchor(
+            List<Reservation> unassigned,
+            List<VehiculeOccupation> occupations,
+            List<Vehicule> allVehicules,
+            Long nextReservationTime,
+            long previousWindowEndMs) {
+
+        long lowerBound = previousWindowEndMs == Long.MIN_VALUE ? Long.MIN_VALUE : previousWindowEndMs;
         long latestUnassignedArrival = 0;
         for (Reservation r : unassigned) {
             if (r.getDateArrivee() != null) {
@@ -696,15 +903,58 @@ public class GroupingService {
             }
         }
 
-        long earliestVehicleReturn = Long.MAX_VALUE;
+        Long earliestVehicleReturn = null;
         for (VehiculeOccupation occ : occupations) {
-            earliestVehicleReturn = Math.min(earliestVehicleReturn, occ.fin.getTime());
+            long returnTime = occ.fin.getTime();
+            if (returnTime < lowerBound) {
+                continue;
+            }
+            if (earliestVehicleReturn == null || returnTime < earliestVehicleReturn) {
+                earliestVehicleReturn = returnTime;
+            }
         }
 
-        if (earliestVehicleReturn == Long.MAX_VALUE) {
-            return latestUnassignedArrival;
+        Long earliestVehicleAvailability = null;
+        if (allVehicules != null) {
+            for (Vehicule vehicule : allVehicules) {
+                if (vehicule == null || vehicule.getId() <= 0) {
+                    continue;
+                }
+                long availableTime = computeInitialAvailabilityTime(vehicule, lowerBound);
+                availableTime = getBusyUntil(occupations, vehicule.getId(), availableTime);
+                if (availableTime < lowerBound) {
+                    continue;
+                }
+                if (earliestVehicleAvailability == null || availableTime < earliestVehicleAvailability) {
+                    earliestVehicleAvailability = availableTime;
+                }
+            }
         }
-        return Math.max(latestUnassignedArrival, earliestVehicleReturn);
+
+        Long candidateReservation = null;
+        if (nextReservationTime != null && nextReservationTime >= lowerBound) {
+            candidateReservation = nextReservationTime;
+        }
+
+        Long candidateVehicle = earliestVehicleAvailability;
+        if (earliestVehicleReturn != null
+                && (candidateVehicle == null || earliestVehicleReturn < candidateVehicle)) {
+            candidateVehicle = earliestVehicleReturn;
+        }
+
+        if (candidateVehicle != null
+                && (candidateReservation == null || candidateVehicle <= candidateReservation)) {
+            long anchor = Math.max(latestUnassignedArrival, candidateVehicle);
+            return new RetryAnchor(anchor, WindowAnchorType.VEHICLE_RETURN);
+        }
+
+        if (candidateReservation != null) {
+            long anchor = Math.max(latestUnassignedArrival, candidateReservation);
+            return new RetryAnchor(anchor, WindowAnchorType.RESERVATION);
+        }
+
+        long anchor = Math.max(latestUnassignedArrival, lowerBound);
+        return new RetryAnchor(anchor, WindowAnchorType.RESERVATION);
     }
 
     private Reservation splitReservation(Reservation source, int passengerCount) {
@@ -769,6 +1019,21 @@ public class GroupingService {
             this.vehiculeId = vehiculeId;
             this.debut = debut;
             this.fin = fin;
+        }
+    }
+
+    private enum WindowAnchorType {
+        RESERVATION,
+        VEHICLE_RETURN
+    }
+
+    private static class RetryAnchor {
+        long timeMs;
+        WindowAnchorType type;
+
+        RetryAnchor(long timeMs, WindowAnchorType type) {
+            this.timeMs = timeMs;
+            this.type = type;
         }
     }
 }
