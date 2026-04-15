@@ -9,9 +9,9 @@
 -- Table LIEUX
 -- ============================
 \c postgres;
-DROP DATABASE IF EXISTS sprint_5;
-CREATE DATABASE sprint_5;
-\c sprint_5;
+DROP DATABASE IF EXISTS sprint_100;
+CREATE DATABASE sprint_100;
+\c sprint_100;
 CREATE TABLE lieux (
     id SERIAL PRIMARY KEY,
     lieu VARCHAR(150) NOT NULL
@@ -55,7 +55,8 @@ CREATE TABLE vehicule (
     id SERIAL PRIMARY KEY,
     reference VARCHAR(100) NOT NULL UNIQUE,
     nombre_place INTEGER NOT NULL,
-    type_carburant VARCHAR(2) NOT NULL CHECK (type_carburant IN ('D', 'ES', 'H', 'EL'))
+    type_carburant VARCHAR(2) NOT NULL CHECK (type_carburant IN ('D', 'ES', 'H', 'EL')),
+    heure_disponibilite TIME NOT NULL DEFAULT '00:00:00'
 );
 -- D = Diesel, ES = Essence, H = Hybride, EL = Electrique
 
@@ -111,48 +112,6 @@ CREATE TABLE reservation (
 );
 
 -- ============================
--- Données d'exemple
--- ============================
-
--- Lieux
-INSERT INTO lieux (lieu) VALUES
-('Nosy Be'),
-('Antananarivo');
-
--- Hotels
-INSERT INTO hotel (nom, adresse, ville, lieux_id) VALUES
-('hotel1', 'Rue des Cocotiers', 'Nosy Be', 1);
-
--- Aeroports
-INSERT INTO aeroport (code, libelle, lieux_id) VALUES
-('TNR', 'Aéroport International d''Ivato', 2);
-
--- Vehicules
-INSERT INTO vehicule (reference, nombre_place, type_carburant) VALUES
-('VH-001', 12, 'D'),
-('VH-002', 5, 'ES');p
-
--- Parametre
-INSERT INTO parametre (temps_attente, vitesse_moyenne) VALUES (30, 50);
-
--- Distances (une seule entrée par paire, bidirectionnelle)
--- 1=Nosy Be, 2=Antananarivo, 3=Antsiranana, 4=Fianarantsoa
--- 5=Aéroport Fascène, 6=Aéroport Ivato, 7=Aéroport Arrachart, 8=Aéroport Fianarantsoa
-INSERT INTO distance (lieux_from, lieux_to, valeur) VALUES
-
--- === Ville <-> Ville ===
-(1, 2, 50);   -- Nosy Be <-> Antananarivo
-
--- reservations
-INSERT INTO reservation (client_id, nombre_passager, date_arrivee, hotel_id, aeroport_id) VALUES
-('client1', 7,  '2026-03-12 09:00:00', 1, 1),
-('client2', 11, '2026-03-12 09:00:00', 1, 1),
-('client3', 3,  '2026-03-12 09:00:00', 1, 1),
-('Client4', 1,  '2026-03-12 09:00:00', 1, 1),
-('client5', 2,  '2026-03-12 09:00:00', 1, 1),
-('client6', 20, '2026-03-12 09:00:00', 1, 1);
-
--- ============================
 -- Table PLANIFICATION
 -- ============================
 CREATE TABLE planification (
@@ -175,3 +134,68 @@ CREATE TABLE planification (
         REFERENCES vehicule(id)
         ON DELETE SET NULL
 );
+
+-- ============================
+-- Donnees d'exemple pour tester la regle 4
+-- VEHICULE AVEC LE MOINS DE TRAJETS
+-- ============================
+
+-- Lieux
+INSERT INTO lieux (lieu) VALUES
+('Aeroport Ivato'),
+('Hotel Zone A'),
+('Hotel Zone B');
+
+-- Hotels (distances differentes depuis l'aeroport)
+INSERT INTO hotel (nom, adresse, ville, lieux_id) VALUES
+('Hotel Alpha', 'Lot A1', 'Antananarivo', 2),
+('Hotel Bravo', 'Lot B2', 'Antananarivo', 3);
+
+-- Aeroports
+INSERT INTO aeroport (code, libelle, lieux_id) VALUES
+('TNR', 'Aeroport International d''Ivato', 1);
+
+-- Vehicules (jeu reinitialise pour scenario regle 4)
+-- Uniquement diesel et essence, avec plus de vehicules pour tester le remplissage.
+INSERT INTO vehicule (reference, nombre_place, type_carburant, heure_disponibilite) VALUES
+('VH-001', 6, 'D', '11:00:00'),
+('VH-002', 6, 'ES', '11:00:00'),
+('VH-003', 10, 'D', '00:00:00'),
+('VH-004', 10, 'ES', '00:00:00'),
+('VH-005', 4, 'D', '00:00:00'),
+('VH-006', 4, 'ES', '00:00:00');
+
+-- Parametre
+INSERT INTO parametre (temps_attente, vitesse_moyenne) VALUES (30, 40);
+
+-- Distances (une seule entree par paire, bidirectionnelle)
+-- 1=Aeroport Ivato, 2=Hotel Zone A, 3=Hotel Zone B
+INSERT INTO distance (lieux_from, lieux_to, valeur) VALUES
+-- Aeroport -> hotels (distances volontairement differentes)
+(1, 2, 8.0),
+(1, 3, 20.0),
+-- Liaison entre les 2 hotels
+(2, 3, 13.0);
+
+-- Reservations
+-- Scenario regle 4 SANS planifications pre-remplies:
+-- - Les fenetres sont de 30 min.
+-- - Les trajets sont construits pendant la planification de la journee.
+-- - TEST-R4-001 arrive plus tard, quand VH-001 et VH-002 sont tous deux adequats,
+--   mais avec un nombre de trajets different (VH-001=2, VH-002=1) :
+--   la regle 4 doit choisir VH-002.
+-- - Plusieurs clients 1 passager permettent de verifier la regle 2 (remplir vehicule).
+INSERT INTO reservation (client_id, nombre_passager, date_arrivee, hotel_id, aeroport_id) VALUES
+('W1-CLIENT-01', 5, '2026-03-19 06:00:00', 1, 1),
+('W1-CLIENT-02', 1, '2026-03-19 06:20:00', 2, 1),
+('W1-CLIENT-03', 4, '2026-03-19 06:25:00', 2, 1),
+
+('W2-CLIENT-01', 5, '2026-03-19 07:30:00', 2, 1),
+('W2-CLIENT-02', 1, '2026-03-19 07:40:00', 1, 1),
+('W2-CLIENT-03', 8, '2026-03-19 07:50:00', 1, 1),
+
+('W3-CLIENT-01', 6, '2026-03-19 08:20:00', 1, 1),
+('W3-CLIENT-02', 4, '2026-03-19 08:30:00', 2, 1),
+
+('TEST-R4-001', 5, '2026-03-19 09:30:00', 2, 1),
+('TEST-R4-002', 1, '2026-03-19 09:35:00', 1, 1);

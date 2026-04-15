@@ -55,7 +55,8 @@ CREATE TABLE vehicule (
     id SERIAL PRIMARY KEY,
     reference VARCHAR(100) NOT NULL UNIQUE,
     nombre_place INTEGER NOT NULL,
-    type_carburant VARCHAR(2) NOT NULL CHECK (type_carburant IN ('D', 'ES', 'H', 'EL'))
+    type_carburant VARCHAR(2) NOT NULL CHECK (type_carburant IN ('D', 'ES', 'H', 'EL')),
+    heure_disponibilite TIME NOT NULL DEFAULT '00:00:00'
 );
 -- D = Diesel, ES = Essence, H = Hybride, EL = Electrique
 
@@ -138,12 +139,12 @@ INSERT INTO aeroport (code, libelle, lieux_id) VALUES
 ('TNR', 'Aéroport International d''Ivato', 6);
 
 -- Vehicules
-INSERT INTO vehicule (reference, nombre_place, type_carburant) VALUES
-('VH-001', 5, 'ES'),
-('VH-002', 7, 'D'),
-('VH-003', 4, 'EL'),
-('VH-004', 5, 'H'),
-('VH-005', 9, 'D');
+INSERT INTO vehicule (reference, nombre_place, type_carburant, heure_disponibilite) VALUES
+('VH-001', 5, 'ES', '11:00:00'),
+('VH-002', 7, 'D', '11:00:00'),
+('VH-003', 4, 'EL', '00:00:00'),
+('VH-004', 5, 'H', '00:00:00'),
+('VH-005', 9, 'D', '00:00:00');
 
 -- Parametre
 INSERT INTO parametre (temps_attente, vitesse_moyenne) VALUES (30, 30);

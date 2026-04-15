@@ -12,16 +12,20 @@ Ce système implémente la fonctionnalité de regroupement de réservations selo
    - ✓ Exemple valide: Réservation de 4 personnes + Réservation de 2 personnes = 6 personnes dans un véhicule 7 places
    - Le total des passagers doit être inférieur (pas égal) à la capacité du véhicule
 
-3. **Clients indivisibles**: 
-   - Les groupes de clients ne peuvent pas être séparés
-   - Exemple: Réservation de 4 + Réservation de 3 ne peuvent pas être dans un véhicule 7 places (4+3=7)
+3. **Split de réservation autorisé**: 
+   - Une réservation peut être découpée en plusieurs sous-groupes de passagers
+   - Exemple: Réservation de 7 passagers peut être répartie en 4 + 3 sur deux véhicules différents
 
-4. **Ordre de visite**: 
+4. **Priorité du reliquat de split**:
+   - Si une réservation est partiellement servie (ex: 5 passagers dans un véhicule de 4), le reliquat (1 passager) devient prioritaire
+   - Ce reliquat est traité avant les autres clients à la fenêtre suivante
+
+5. **Ordre de visite**: 
    - Les hôtels sont visités dans l'ordre de distance (le plus proche en premier)
    - Exemple: Ivato → Ibis (40km) → Colbert (60km) → Ivato
    - Distance totale: 40 + 20 + 60 = 120km
 
-5. **Distances égales**: 
+6. **Distances égales**: 
    - Si deux destinations ont la même distance, l'ordre alphabétique est utilisé
    - Exemple: Ankadikely et Tsiazompaniry (tous deux à 40km) → Ankadikely en premier
 
@@ -99,11 +103,12 @@ Les réservations sont groupées par fenêtre de 30 minutes basée sur l'heure d
 
 ### Étape 2: Formation de Groupes
 Pour chaque fenêtre temporelle:
-1. Trier les réservations par nombre de passagers (décroissant)
+1. Trier les réservations avec priorité absolue au reliquat de split, puis par nombre de passagers (décroissant)
 2. Pour chaque réservation non assignée:
-   - Créer un nouveau groupe
-   - Essayer d'ajouter d'autres réservations compatibles
-   - Vérifier: total_passagers < capacité_véhicule
+   - Remplir d'abord les véhicules déjà ouverts dans la fenêtre
+   - Si nécessaire, ouvrir un ou plusieurs nouveaux véhicules
+   - Découper la réservation en portions si un seul véhicule ne peut pas absorber tous les passagers
+   - Reporter uniquement le reliquat non affecté à la fenêtre suivante, avec priorité haute
 
 ### Étape 3: Calcul d'Itinéraire
 Pour chaque groupe:
@@ -118,6 +123,19 @@ Pour chaque groupe:
 2. Trier par: places proches du besoin, puis Diesel > Essence > Hybride > Électrique
 3. Vérifier la disponibilité (pas de chevauchement d'occupation)
 4. Assigner le premier véhicule disponible
+
+### Étape 5: Reprise des Non-Assignés Après Retour Véhicule
+Quand il n'y a plus de nouvelles réservations dans la journée, les réservations non assignées ne sont plus marquées immédiatement comme "sans véhicule".
+
+Le service effectue une nouvelle tentative d'assignation en recalculant une ancre temporelle:
+- ancre = max(dernière heure d'arrivée des non-assignés, premier retour de véhicule)
+
+Cela permet de réutiliser un véhicule déjà parti, dès son retour à l'aéroport.
+
+Exemple:
+- Si VH-001 revient à 10:10 et qu'il reste des réservations non assignées, ces réservations sont retentées après 10:10.
+- Si la capacité est suffisante, elles sont affectées à VH-001.
+- Elles ne restent non assignées que si aucune affectation n'est possible après cette tentative finale.
 
 ## Exemple Concret
 

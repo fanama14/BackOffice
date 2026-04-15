@@ -10,6 +10,7 @@ import mg.framework.ModelView;
 import com.backoffice.dao.VehiculeDAO;
 import com.backoffice.model.Vehicule;
 
+import java.sql.Time;
 import java.util.List;
 
 @Controller
@@ -23,21 +24,20 @@ public class VehiculeController {
             @RequestParam("typeCarburant") String typeCarburant,
             @RequestParam("nombrePlaceMin") String nombrePlaceMinStr,
             @RequestParam("nombrePlaceMax") String nombrePlaceMaxStr) {
-        
+
         ModelView mv = new ModelView("vehicule-list");
         try {
             Integer nombrePlaceMin = parseIntOrNull(nombrePlaceMinStr);
             Integer nombrePlaceMax = parseIntOrNull(nombrePlaceMaxStr);
 
             List<Vehicule> vehicules = vehiculeDAO.findWithFilters(
-                search, typeCarburant, nombrePlaceMin, nombrePlaceMax
-            );
+                    search, typeCarburant, nombrePlaceMin, nombrePlaceMax);
             mv.addData("vehicules", vehicules);
             mv.addData("search", search);
             mv.addData("typeCarburant", typeCarburant);
             mv.addData("nombrePlaceMin", nombrePlaceMinStr);
             mv.addData("nombrePlaceMax", nombrePlaceMaxStr);
-            
+
         } catch (Exception e) {
             mv.addData("error", "Erreur lors du chargement des véhicules : " + e.getMessage());
         }
@@ -76,17 +76,19 @@ public class VehiculeController {
             @RequestParam("id") String idStr,
             @RequestParam("reference") String reference,
             @RequestParam("nombrePlace") int nombrePlace,
-            @RequestParam("typeCarburant") String typeCarburant) {
-        
+            @RequestParam("typeCarburant") String typeCarburant,
+            @RequestParam("heureDisponibilite") String heureDisponibiliteStr) {
+
         ModelView mv = new ModelView("vehicule-form");
         try {
             Vehicule vehicule = new Vehicule();
             vehicule.setReference(reference);
             vehicule.setNombrePlace(nombrePlace);
             vehicule.setTypeCarburant(typeCarburant);
+            vehicule.setHeureDisponibilite(parseTimeOrDefault(heureDisponibiliteStr));
 
             Integer id = parseIntOrNull(idStr);
-            
+
             if (id != null && id > 0) {
                 vehicule.setId(id);
                 vehiculeDAO.update(vehicule);
@@ -143,6 +145,21 @@ public class VehiculeController {
             return Integer.parseInt(value.trim());
         } catch (NumberFormatException e) {
             return null;
+        }
+    }
+
+    private Time parseTimeOrDefault(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return Time.valueOf("00:00:00");
+        }
+        String normalized = value.trim();
+        if (normalized.length() == 5) {
+            normalized = normalized + ":00";
+        }
+        try {
+            return Time.valueOf(normalized);
+        } catch (IllegalArgumentException e) {
+            return Time.valueOf("00:00:00");
         }
     }
 }
